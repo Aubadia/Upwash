@@ -6,13 +6,22 @@ Behavior agreed. No test or production implementation has been written. Red and 
 
 ## Goal and Agreed Interface
 
-Implement only the kernel behavior needed to calculate one batch's loss using a required, externally supplied loss function:
+Implement only the kernel behavior needed to calculate one batch's loss using a required, externally supplied loss function.
+
+The batch is a tuple of input tensors and target tensors. With `model`, `inputs`, `targets`, and a kernel configured with `loss_fn` already available, the caller creates the batch before calling the kernel:
+
+```python
+batch = (inputs, targets)
+loss = kernel(model, batch)
+```
+
+The kernel returns a scalar (zero-dimensional) `torch.Tensor`. Its internal computation follows this order (pseudocode):
 
 ```text
-kernel(model, batch) -> scalar Tensor
-batch = (inputs, targets)
+inputs, targets = batch
 predictions = model(inputs)
 loss = loss_fn(predictions, targets)
+return loss
 ```
 
 Supply `loss_fn` when constructing or configuring the kernel; do not assume MSE or provide a default loss function. For this first supervised kernel, `loss_fn` accepts predictions and targets and returns a scalar tensor. The supplied loss function controls reduction; the kernel does not impose mean reduction. The Trainer's target API remains unchanged and does not receive `loss_fn` directly.
