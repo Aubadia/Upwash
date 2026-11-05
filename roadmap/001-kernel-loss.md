@@ -2,7 +2,7 @@
 
 ## Status
 
-Interface agreed on 2026-11-05. The first supplied-MSE test has been written and run, but collection fails because the empty production module does not define `Trainer`. Numerical Red and Green have not been established. The supplied-L1 case remains the next small test after the MSE case is exercised.
+Interface agreed on 2026-11-05. The user has implemented `Trainer` and `compute_loss`. The supplied-MSE test now executes and fails numerically: expected scalar loss `4.0`, observed `1.0`, because `compute_loss` passes raw inputs to the loss function without calling the model. Numerical Red is confirmed; Green has not been established. The supplied-L1 case remains pending until the MSE case passes.
 
 The filename is retained to preserve existing links. "Kernel" in this project means an operation implementation such as matmul or attention. The earlier training-computation kernel interface is withdrawn; this task does not implement an operation kernel.
 
@@ -57,24 +57,24 @@ MSE and L1 are test inputs, not built-in training choices. These single-element 
 
 ## Next Actions
 
-1. The user provides the production `Trainer` interface. The agent must not create declarations or stubs to make the test importable.
-2. Rerun the supplied-MSE test when the interface exists. Report the actual result; collection failure is not numerical Red. The user may implement the full behavior directly, in which case report any verified Green without claiming a prior numerical Red.
-3. After the MSE case is exercised, add the supplied-L1 case as the next small TDD step to verify that the externally supplied loss function controls the result.
+1. The user updates `compute_loss` to call the model with inputs and pass its predictions to the supplied loss function. Numerical Red has been confirmed; production changes remain user-owned.
+2. Rerun `./test.sh tests/unit/core/test_trainer_loss.py` and report Green only if the numerical assertion passes.
+3. After the MSE case passes, add the supplied-L1 case as the next small TDD step to verify that the externally supplied loss function controls the result.
 4. Once both cases pass, record task 001 as complete and move to task 002 for gradient verification.
 
 ## Test Evidence
 
 - Convenient runner: `./test.sh tests/unit/core/test_trainer_loss.py`. With no arguments, `./test.sh` runs all tests. The user approved this script; it uses the existing virtual environment and installs no dependencies. See the root README for usage.
-- Test command: `PYTHONPATH=src .venv/bin/python -m pytest tests/unit/core/test_trainer_loss.py -q`.
-- Failing case: `test_compute_loss_uses_supplied_mse_loss`; the case did not execute because collection failed.
+- Test command: `./test.sh tests/unit/core/test_trainer_loss.py`.
+- Failing case: `test_compute_loss_uses_supplied_mse_loss`; collection succeeds and the numerical assertion executes.
 - Expected result: A zero-dimensional `torch.Tensor` approximately equal to `4.0` with supplied MSE loss, using `rtol=1e-6` and `atol=1e-6`.
-- Observed result: Exit code 2, one collection error: `ImportError: cannot import name 'Trainer' from 'upwash.core.trainer'`.
-- Failure cause: `src/upwash/core/trainer.py` is empty. The model/loss numerical behavior has not been exercised, so this is not numerical Red.
+- Observed result: Exit code 1, `1 failed, 1 warning`. The scalar-tensor assertions pass, but the numerical assertion reports `Expected 4.0 but got 1.0`.
+- Failure cause: `compute_loss` currently returns `self.loss_fn(inputs, targets)`, computing `(1 - 2)^2 = 1`. The agreed behavior calls the zero-weight model first and computes `(0 - 2)^2 = 4` from predictions. This confirms the intended numerical Red.
 - Environment: Python 3.14.6, torch 2.15.0, pytest 9.2.0. Pytest was initially absent and became available during this session after the user elected to prepare it. The agent did not install packages or modify dependency/test configuration. The command uses `PYTHONPATH=src` because Upwash is not installed in the environment.
-- Additional output: PyTorch warned that NumPy is unavailable; the blocking error is the missing `Trainer`, not that warning. No NumPy dependency has been added by the agent.
-- Pending prerequisite: User-written production interface and implementation. The L1 test has not yet been written or run; no tests have passed.
+- Additional output: PyTorch warned that NumPy is unavailable; the test executes and fails on the numerical assertion independently of that warning. No NumPy dependency has been added by the agent.
+- Next action: User fixes the production forward/loss computation, then the agent verifies the MSE case. The L1 test has not yet been written or run; no tests have passed.
 
-### Runner Verification (2026-11-05)
+### Earlier Runner Verification (2026-11-05, Before the User's Implementation)
 
 - `sh -n test.sh`: passed shell syntax validation.
 - `./test.sh`: exit 2, the same missing-`Trainer` collection error described above.
