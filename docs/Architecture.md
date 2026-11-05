@@ -9,21 +9,27 @@ The following tree reflects the current local files and directories, excluding G
 ```text
 Upwash/
 ├── .gitignore
+├── .python-version
 ├── README.md
-├── builder.py
-├── components/
-│   ├── kernels/
-│   ├── optimizers/
-│   └── schedulers/
-├── config.py
-├── core/
-│   ├── contracts.py
-│   ├── data.py
-│   ├── logger.py
-│   ├── state.py
-│   └── trainer.py
+├── AGENTS.md
 ├── docs/
 │   └── Architecture.md
+├── pyproject.toml
+├── src/
+│   └── upwash/
+│       ├── __init__.py
+│       ├── builder.py
+│       ├── components/
+│       │   ├── kernels/
+│       │   ├── optimizers/
+│       │   └── schedulers/
+│       ├── config.py
+│       └── core/
+│           ├── contracts.py
+│           ├── data.py
+│           ├── logger.py
+│           ├── state.py
+│           └── trainer.py
 └── tests/
     ├── conftest.py
     ├── integration/
@@ -31,6 +37,8 @@ Upwash/
         ├── components/
         └── core/
 ```
+
+Production modules live under `src/upwash/`. Module paths below are relative to that package directory. Tests and documentation remain at the repository root.
 
 ## Responsibilities and Dependencies
 

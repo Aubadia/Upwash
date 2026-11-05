@@ -1,0 +1,51 @@
+# Python bytecode and virtual environments
+__pycache__/
+*.py[cod]
+/.venv/
+/venv/
+
+# Local caches
+/.uv-cache/
+/.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# Test coverage
+.coverage
+.coverage.*
+/htmlcov/
+/coverage.xml
+/junit.xml
+
+# Build and packaging artifacts
+/build/
+/dist/
+*.egg-info/
+.eggs/
+
+# Local environment variables
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Generated training outputs (keep small test fixtures trackable)
+/outputs/
+/checkpoints/
+/runs/
+/logs/
+/wandb/
+
+# Notebook checkpoints and editor temporary files
+.ipynb_checkpoints/
+*.swp
+*.swo
+*~
+
+# macOS metadata
+.DS_Store
+._*
+
+# Keep uv.lock and .python-version versioned for reproducibility.
