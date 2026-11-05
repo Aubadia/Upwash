@@ -19,6 +19,7 @@ Upwash/
 │   ├── README.md
 │   └── 001-kernel-loss.md
 ├── pyproject.toml
+├── test.sh
 ├── src/
 │   └── upwash/
 │       ├── __init__.py
@@ -40,6 +41,7 @@ Upwash/
     └── unit/
         ├── components/
         └── core/
+            └── test_trainer_loss.py
 ```
 
 Production modules live under `src/upwash/`. Module paths below are relative to that package directory. Tests and documentation remain at the repository root.
@@ -47,15 +49,15 @@ Production modules live under `src/upwash/`. Module paths below are relative to 
 ## Responsibilities and Dependencies
 
 - `core`: Training lifecycle, data iteration, runtime state, and logging services.
-- `components/kernels`: Model calls, batch interpretation, and loss and metric computation.
+- `components/kernels`: Replaceable operation implementations such as matmul, attention, and fused tensor operations. Kernel interfaces operate on the tensors and parameters required by their operations; they do not represent a complete model-and-batch training computation.
 - `components/optimizers`: Rules for converting gradients into parameter updates.
 - `components/schedulers`: Learning rate adjustments based on progress or evaluation results.
 - `config.py`: Settings for a training run, organized through composition. Add component-specific configuration as needed.
 - `builder.py`: Component construction and wiring.
 
-Core uses shared contracts, which concrete components implement. The builder injects those components, keeping core independent of concrete kernels, optimizers, and schedulers. Initially, contracts shared between core and components live in `core/contracts.py`. Add shared implementations within each component family as needed.
+Core uses shared contracts where tested interactions require them, keeping it independent of concrete component implementations. The builder constructs and connects runtime objects as needed. Operation kernels belong at the operation layer used by models or loss functions; the minimal Trainer does not require a generic operation-kernel argument. Kernel selection and replacement mechanisms remain to be designed when a concrete operation requirement arises. Initially, contracts shared between core and components live in `core/contracts.py`. Add shared implementations within each component family as needed.
 
-Batch iteration, kernel computation, and parameter updates need clear interaction points to accommodate gradient accumulation and update methods that require repeated loss computation. Tests for these behaviors drive the concrete interfaces.
+Batch iteration, forward/loss computation, and parameter updates need clear interaction points to accommodate gradient accumulation and update methods that require repeated loss computation. The agreed first supervised interface is `Trainer(model=model, loss_fn=loss_fn)` with `trainer.compute_loss(inputs, targets)`. Trainer holds the externally supplied model and loss function, calls `model(inputs)`, and returns `loss_fn(predictions, targets)` as a scalar tensor. The first training loop will interpret each batch as `(inputs, targets)`; this is the initial supported format, not a universal batch format. Additional calling conventions will be designed from concrete requirements. Optimizer construction and injection remain for the update task.
 
 ## Test Layers
 
@@ -63,7 +65,7 @@ Batch iteration, kernel computation, and parameter updates need clear interactio
 | --- | --- | --- |
 | Unit | Computation, state transitions, and error handling within individual components | Use small datasets; inject simple fakes for flow tests |
 | Contracts | Whether interchangeable implementations follow the same input, output, and state semantics | Add shared tests when alternative implementations or public extension interfaces are introduced |
-| Integration | Cooperation between the trainer, data, kernel, and a real optimizer | Use small CPU models to verify numerical results and actual parameter updates |
+| Integration | Cooperation between the trainer, data, model/loss computation, and a real optimizer | Use small CPU models to verify numerical results and actual parameter updates |
 
 Organize unit tests by module and name integration tests by scenario. Avoid mechanically creating a matching test file for every source file. Keep only fixtures with an established shared use in `conftest.py`.
 

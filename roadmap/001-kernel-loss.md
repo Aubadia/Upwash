@@ -2,69 +2,83 @@
 
 ## Status
 
-Behavior agreed. No test or production implementation has been written. Red and Green have not been established.
+Interface agreed on 2026-11-05. The first supplied-MSE test has been written and run, but collection fails because the empty production module does not define `Trainer`. Numerical Red and Green have not been established. The supplied-L1 case remains the next small test after the MSE case is exercised.
 
-## Goal and Agreed Interface
+The filename is retained to preserve existing links. "Kernel" in this project means an operation implementation such as matmul or attention. The earlier training-computation kernel interface is withdrawn; this task does not implement an operation kernel.
 
-Implement only the kernel behavior needed to calculate one batch's loss using a required, externally supplied loss function.
+## Goal
 
-The batch is a tuple of input tensors and target tensors. With `model`, `inputs`, `targets`, and a kernel configured with `loss_fn` already available, the caller creates the batch before calling the kernel:
+Establish the smallest Upwash behavior that computes a scalar loss using a real model and an externally supplied loss function.
+
+The agreed public interface is:
 
 ```python
-batch = (inputs, targets)
-loss = kernel(model, batch)
+from upwash.core.trainer import Trainer
+
+trainer = Trainer(model=model, loss_fn=loss_fn)
+loss = trainer.compute_loss(inputs, targets)
 ```
 
-The kernel returns a scalar (zero-dimensional) `torch.Tensor`. Its internal computation follows this order (pseudocode):
+Trainer holds the externally supplied model and loss function. The first supervised flow uses explicit input and target tensors. Later, Trainer will unpack `(inputs, targets)` batches before calling this method. This is the initial supported format, not a universal batch format. Other calling conventions and optimizer injection remain deferred.
 
-```text
-inputs, targets = batch
+The numerical calculation is:
+
+```python
 predictions = model(inputs)
 loss = loss_fn(predictions, targets)
-return loss
 ```
 
-Supply `loss_fn` when constructing or configuring the kernel; do not assume MSE or provide a default loss function. For this first supervised kernel, `loss_fn` accepts predictions and targets and returns a scalar tensor. The supplied loss function controls reduction; the kernel does not impose mean reduction. The Trainer's target API remains unchanged and does not receive `loss_fn` directly.
-
-The concrete callable's public name, import path, and construction/configuration syntax for supplying `loss_fn` remain to be agreed before writing its test. A callable is sufficient; this task does not require introducing a class or shared contract.
+`compute_loss` performs this computation and returns the loss tensor. The loss function is externally supplied, with no default MSE. Its configuration controls reduction, and it must return a scalar tensor for this initial training flow.
 
 The loss must ultimately preserve its gradient path as described in [the Trainer goal](../docs/Trainer.md). Task 002 will verify that separately.
 
-## Small Acceptance Cases
+## Agreed Small Acceptance Cases
+
+Through the agreed Upwash interface:
 
 - Execute on CPU with float32 tensors.
 - Use `torch.nn.Linear(1, 1, bias=False)` with its weight explicitly initialized to zero.
 - Set `inputs = [[1.0]]` and `targets = [[2.0]]` as tensors.
-- Configure the actual kernel with the supplied loss function and call it with the model and `(inputs, targets)`.
-- First supply `torch.nn.MSELoss(reduction="mean")` and assert that the result is a zero-dimensional `torch.Tensor` with value approximately `4.0`.
-- Then add a separate case supplying `torch.nn.L1Loss(reduction="mean")` with the same model state and inputs, and assert that the result is a zero-dimensional `torch.Tensor` with value approximately `2.0`. This checks that the kernel uses the supplied loss function rather than always computing MSE.
+- First supply `torch.nn.MSELoss(reduction="mean")` through the agreed interface and assert a zero-dimensional `torch.Tensor` with value approximately `4.0`.
+- Then add a separate case supplying `torch.nn.L1Loss(reduction="mean")` with the same model state and inputs, and assert a zero-dimensional `torch.Tensor` with value approximately `2.0`.
 
 Independent calculation: prediction is `0 * 1 = 0`, so squared error is `(0 - 2)^2 = 4` and absolute error is `abs(0 - 2) = 2`. Use a suitable tolerance, such as `rtol=1e-6` and `atol=1e-6`.
 
-MSE and L1 are test inputs, not built-in kernel choices. These single-element cases do not independently distinguish mean from sum reduction on multiple elements; add that case later rather than claiming it is already covered.
+MSE and L1 are test inputs, not built-in training choices. These single-element cases do not independently distinguish mean from sum reduction on multiple elements. A test that only invokes PyTorch's model and loss function would establish a baseline, not verify an Upwash implementation.
 
 ## Scope
 
-- Production destination: `src/upwash/components/kernels/`; the user chooses and writes the concrete module and callable.
-- Proposed test destination: `tests/unit/components/test_kernel_loss.py`.
-- Use the actual kernel and a real PyTorch model. Do not substitute a test-only kernel for the behavior being tested.
-- No Trainer, backward call, optimizer update, state, builder, or configuration implementation is needed for this task.
+- Production destination: `src/upwash/core/trainer.py`, class `Trainer`, method `compute_loss(inputs, targets)`. Test destination: `tests/unit/core/test_trainer_loss.py`. Do not place model-and-batch orchestration in `components/kernels/`.
+- Use the actual agreed Upwash behavior and a real PyTorch model. Do not substitute test support code for the behavior being tested.
+- No custom matmul, attention, or other operation-kernel implementation is needed.
+- Do not introduce a replacement training-step abstraction solely to preserve the previous design.
+- Backward, optimizer updates, state, and builder implementation belong to later steps.
 - This is an independently calculated behavioral test, not a Hugging Face differential comparison.
 
 ## Next Actions
 
-1. Agree the concrete public name, import path, and how `loss_fn` is supplied with the user.
-2. Recheck the test environment and discuss providing pytest before changing dependencies or test configuration. Do not install packages automatically.
-3. Start with the supplied-MSE acceptance test, then add the supplied-L1 case as a separate small TDD step. Do not create production declarations or stubs to make tests importable.
-4. Run the test and report its actual failure. Distinguish an import/collection or environment blocker from a numerical behavior failure; do not claim the intended numerical Red until that behavior is reached and fails.
-5. Once the intended Red is confirmed, hand implementation to the user.
-6. After the user implements the behavior, run the targeted test, record Green if verified, and then move to task 002.
+1. The user provides the production `Trainer` interface. The agent must not create declarations or stubs to make the test importable.
+2. Rerun the supplied-MSE test when the interface exists. Report the actual result; collection failure is not numerical Red. The user may implement the full behavior directly, in which case report any verified Green without claiming a prior numerical Red.
+3. After the MSE case is exercised, add the supplied-L1 case as the next small TDD step to verify that the externally supplied loss function controls the result.
+4. Once both cases pass, record task 001 as complete and move to task 002 for gradient verification.
 
 ## Test Evidence
 
-- Test command: Not run; the proposed test file does not exist yet.
-- Expected result: A scalar tensor approximately equal to `4.0` with supplied MSE loss, or `2.0` with supplied L1 loss.
-- Observed result: Not available.
-- Failure cause: Not established.
-- Pending prerequisites: Public name/import path and loss-function injection syntax agreement, and pytest availability.
+- Convenient runner: `./test.sh tests/unit/core/test_trainer_loss.py`. With no arguments, `./test.sh` runs all tests. The user approved this script; it uses the existing virtual environment and installs no dependencies. See the root README for usage.
+- Test command: `PYTHONPATH=src .venv/bin/python -m pytest tests/unit/core/test_trainer_loss.py -q`.
+- Failing case: `test_compute_loss_uses_supplied_mse_loss`; the case did not execute because collection failed.
+- Expected result: A zero-dimensional `torch.Tensor` approximately equal to `4.0` with supplied MSE loss, using `rtol=1e-6` and `atol=1e-6`.
+- Observed result: Exit code 2, one collection error: `ImportError: cannot import name 'Trainer' from 'upwash.core.trainer'`.
+- Failure cause: `src/upwash/core/trainer.py` is empty. The model/loss numerical behavior has not been exercised, so this is not numerical Red.
+- Environment: Python 3.14.6, torch 2.15.0, pytest 9.2.0. Pytest was initially absent and became available during this session after the user elected to prepare it. The agent did not install packages or modify dependency/test configuration. The command uses `PYTHONPATH=src` because Upwash is not installed in the environment.
+- Additional output: PyTorch warned that NumPy is unavailable; the blocking error is the missing `Trainer`, not that warning. No NumPy dependency has been added by the agent.
+- Pending prerequisite: User-written production interface and implementation. The L1 test has not yet been written or run; no tests have passed.
 
+### Runner Verification (2026-11-05)
+
+- `sh -n test.sh`: passed shell syntax validation.
+- `./test.sh`: exit 2, the same missing-`Trainer` collection error described above.
+- `../test.sh tests/unit/core/test_trainer_loss.py -k 'compute_loss' -v` from `tests/`: exit 2, the same collection error. Project-root resolution and argument forwarding worked; the selected test body could not execute.
+- Absolute-path invocation with `--help` from `/private/tmp`: exit 0, pytest help displayed.
+- Temporary isolated copies verified exit 1 and a clear message for a missing `.venv/bin/python` and for simulated pytest import failure. The actual project environment was not modified.
+- These are runner checks, not numerical Red or Green for loss computation.

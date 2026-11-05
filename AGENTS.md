@@ -62,8 +62,9 @@ When the user requests a bug regression test, reproduce the bug with a failing t
 
 - Keep `core` focused on orchestration and infrastructure: the training lifecycle, data iteration, runtime state, and logging.
 - Keep replaceable training behavior in `components`, including kernels, optimizers, and schedulers.
+- In this project, kernels are operation implementations such as matmul, attention, or fused tensor operations. Do not use "kernel" to mean a complete model-and-batch training computation.
 - Keep core independent of concrete component implementations. Build and connect runtime objects through the builder.
-- Introduce shared contracts when the tested behavior requires them. Keep batch iteration, kernel computation, and parameter updates distinct enough to support future extensions.
+- Introduce shared contracts when the tested behavior requires them. Keep batch iteration, forward/loss computation, and parameter updates distinct enough to support future extensions.
 - Prefer configuration composition. Add component-specific configuration and abstractions as real requirements emerge.
 - Evolve the stack incrementally; do not assume complete HuggingFace Trainer API or feature parity is required for each change.
 

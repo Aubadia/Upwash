@@ -9,30 +9,29 @@ Read [the architecture](../docs/Architecture.md), [the Trainer goal](../docs/Tra
 ## Current Position
 
 - **Current task:** [001 — Compute one batch's loss](001-kernel-loss.md).
-- **Stage:** Behavior agreed; test writing and production implementation have not started.
-- **Completed:** Agreed the target Trainer usage and the first kernel's input/output behavior; clarified that the kernel uses a required, externally supplied `loss_fn` rather than a fixed MSE loss; recorded the goal and session handoff.
-- **Implementation:** The current core modules are empty, and no kernel implementation or behavior tests exist yet. An empty `tests/conftest.py` is present.
-- **Test evidence:** No behavior tests have been written or run. Neither Red nor Green has been established.
-- **Environment:** The project environment was inspected as Python 3.14.6 and torch 2.15.0; pytest and transformers were not installed. Recheck before testing. No dependency or test configuration changes have been authorized.
-- **Next action:** Agree the first kernel's public name/import path and how `loss_fn` is supplied, and discuss how pytest will be provided. Then write and run the smallest task-001 test, without creating production stubs.
+- **Stage:** Interface agreed; first MSE test written, blocked at collection by the missing production `Trainer` class.
+- **Completed:** Agreed `Trainer(model=model, loss_fn=loss_fn)` and `trainer.compute_loss(inputs, targets)`. Trainer holds the model and supplied loss function, computes `loss_fn(model(inputs), targets)`, and initially supports supervised input/target data. The first training loop will unpack `(inputs, targets)` batches. Kernel terminology remains operation-level. Added the user-approved `test.sh` runner and README usage instructions; no dependencies were changed by the agent.
+- **Implementation:** The core modules remain empty; the agent has not changed production code. `tests/unit/core/test_trainer_loss.py` now contains the first supplied-MSE test. The supplied-L1 case is pending.
+- **Test evidence:** Both `./test.sh` and `../test.sh tests/unit/core/test_trainer_loss.py -k 'compute_loss' -v` (from `tests/`) exited 2 with one collection error: `ImportError: cannot import name 'Trainer' from 'upwash.core.trainer'`. The numerical case did not execute; neither numerical Red nor Green has been established. Runner syntax, help from outside the project, and missing-environment error branches were checked successfully; these checks do not establish task 001 behavior.
+- **Environment:** Verified Python 3.14.6, torch 2.15.0, and pytest 9.2.0. Pytest became available during this session after the user elected to prepare it. The agent did not change dependencies or test configuration. Upwash is not installed, so the test command uses `PYTHONPATH=src`. PyTorch also warned about missing NumPy; that warning was not the collection blocker.
+- **Next action:** The user provides the production Trainer interface and implementation. Rerun `./test.sh tests/unit/core/test_trainer_loss.py` and report the actual result, then add the L1 case as the next small TDD step. Do not create production stubs or label collection failure as numerical Red.
 
 The user writes production code. The agent supports design, tests, failure analysis, and documentation under [AGENTS.md](../AGENTS.md).
 
 ## Incremental Route
 
-Only task 001 is active. Later rows describe the intended sequence; settle any additional interface details when each task is reached.
+Task 001 has an agreed interface and the first test awaiting production implementation. Later rows describe the intended sequence; settle additional interface details when each task is reached.
 
 | Task | Small behavior | Acceptance evidence | Status |
 | --- | --- | --- | --- |
-| [001](001-kernel-loss.md) | Compute a single batch's scalar loss using the supplied `loss_fn`. | Zero-dimensional tensor approximately equal to `4` with supplied MSE loss and `2` with supplied L1 loss for the fixed example. | Behavior agreed; not started. |
-| 002 | Preserve the kernel's gradient path. | Backward through its returned loss produces model gradient approximately `-4` with supplied MSE loss. | Planned. |
+| [001](001-kernel-loss.md) | Compute one example's scalar loss using the supplied `loss_fn`. | Scalar loss approximately `4` with MSE and `2` with L1 for the fixed example. | Interface agreed; MSE test collection blocked by missing `Trainer`. L1 test pending. |
+| 002 | Preserve the loss's gradient path. | Backward through the returned loss produces model gradient approximately `-4` with supplied MSE loss. | Planned. |
 | 003 | Complete one Trainer update. | Real SGD changes the model weight from `0` to approximately `0.4`. | Planned. |
-| 004 | Process a second batch with fresh gradients. | A second identical batch produces weight approximately `0.72`. | Planned. |
+| 004 | Process a second batch with fresh gradients. | A second identical example produces weight approximately `0.72`. | Planned. |
 | 005 | Verify training mode and expose progress. | Training executes in training mode; two completed updates return `global_step == 2`. | Planned. |
 
-The numerical update examples in tasks 003 and 004 use an externally supplied MSE loss with mean reduction; MSE is not built into the kernel. Create later task files when their scope is ready. Add boundary and error cases as their expected behavior is agreed.
+The numerical update examples in tasks 003 and 004 use an externally supplied MSE loss with mean reduction. Custom operation kernels are not needed for these tasks. Create later task files when their scope is ready, and add boundary and error cases as their expected behavior is agreed.
 
 ## Maintaining This Record
 
 After a meaningful change, update the current task and this overview with what actually changed, the exact test command and outcome, any blocker, and the next action. Distinguish implementation present from behavior verified. Do not label a missing dependency, an unrelated failure, or a missing import as evidence that the intended numerical behavior has been exercised.
-
