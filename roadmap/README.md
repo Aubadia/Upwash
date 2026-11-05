@@ -10,11 +10,11 @@ Read [the architecture](../docs/Architecture.md), [the Trainer goal](../docs/Tra
 
 - **Current task:** [001 — Compute one batch's loss](001-kernel-loss.md).
 - **Stage:** Behavior agreed; test writing and production implementation have not started.
-- **Completed:** Agreed the target Trainer usage and the first kernel's input/output behavior; recorded the goal and session handoff.
+- **Completed:** Agreed the target Trainer usage and the first kernel's input/output behavior; clarified that the kernel uses a required, externally supplied `loss_fn` rather than a fixed MSE loss; recorded the goal and session handoff.
 - **Implementation:** The current core modules are empty, and no kernel implementation or behavior tests exist yet. An empty `tests/conftest.py` is present.
 - **Test evidence:** No behavior tests have been written or run. Neither Red nor Green has been established.
 - **Environment:** The project environment was inspected as Python 3.14.6 and torch 2.15.0; pytest and transformers were not installed. Recheck before testing. No dependency or test configuration changes have been authorized.
-- **Next action:** Agree the first kernel's public name/import path and discuss how pytest will be provided. Then write and run the smallest task-001 test, without creating production stubs.
+- **Next action:** Agree the first kernel's public name/import path and how `loss_fn` is supplied, and discuss how pytest will be provided. Then write and run the smallest task-001 test, without creating production stubs.
 
 The user writes production code. The agent supports design, tests, failure analysis, and documentation under [AGENTS.md](../AGENTS.md).
 
@@ -24,13 +24,13 @@ Only task 001 is active. Later rows describe the intended sequence; settle any a
 
 | Task | Small behavior | Acceptance evidence | Status |
 | --- | --- | --- | --- |
-| [001](001-kernel-loss.md) | Compute a single batch's scalar MSE loss. | Zero-dimensional tensor approximately equal to `4` for the fixed example. | Behavior agreed; not started. |
-| 002 | Preserve the kernel's gradient path. | Backward through its returned loss produces model gradient approximately `-4`. | Planned. |
+| [001](001-kernel-loss.md) | Compute a single batch's scalar loss using the supplied `loss_fn`. | Zero-dimensional tensor approximately equal to `4` with supplied MSE loss and `2` with supplied L1 loss for the fixed example. | Behavior agreed; not started. |
+| 002 | Preserve the kernel's gradient path. | Backward through its returned loss produces model gradient approximately `-4` with supplied MSE loss. | Planned. |
 | 003 | Complete one Trainer update. | Real SGD changes the model weight from `0` to approximately `0.4`. | Planned. |
 | 004 | Process a second batch with fresh gradients. | A second identical batch produces weight approximately `0.72`. | Planned. |
 | 005 | Verify training mode and expose progress. | Training executes in training mode; two completed updates return `global_step == 2`. | Planned. |
 
-Create later task files when their scope is ready. Add boundary and error cases as their expected behavior is agreed.
+The numerical update examples in tasks 003 and 004 use an externally supplied MSE loss with mean reduction; MSE is not built into the kernel. Create later task files when their scope is ready. Add boundary and error cases as their expected behavior is agreed.
 
 ## Maintaining This Record
 
