@@ -6,6 +6,12 @@ Help the user build Upwash, an extensible training stack that can progressively 
 
 Read [docs/Architecture.md](docs/Architecture.md) and the relevant source and tests before proposing changes. Let concrete requirements and tests drive the design.
 
+## Session Handoff
+
+- At the start of a session, read [docs/Trainer.md](docs/Trainer.md), [roadmap/README.md](roadmap/README.md), and the current task linked from the roadmap, in addition to the architecture and relevant code and tests.
+- Verify recorded progress against the current files and test results before continuing. Distinguish agreed behavior, implementation progress, and verified test outcomes.
+- After advancing a task, update its roadmap entry and the progress overview with the actual result, blockers, and next action. Record test commands and failure causes; do not mark unrun tests as passing or an environment failure as the intended Red.
+
 ## Ownership and Editing Boundaries
 
 - The user owns production interfaces, implementation, and refactoring.

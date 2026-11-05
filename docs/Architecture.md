@@ -13,7 +13,11 @@ Upwash/
 ├── README.md
 ├── AGENTS.md
 ├── docs/
-│   └── Architecture.md
+│   ├── Architecture.md
+│   └── Trainer.md
+├── roadmap/
+│   ├── README.md
+│   └── 001-kernel-loss.md
 ├── pyproject.toml
 ├── src/
 │   └── upwash/
