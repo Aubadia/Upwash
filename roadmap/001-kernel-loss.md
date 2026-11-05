@@ -2,7 +2,7 @@
 
 ## Status
 
-Interface agreed on 2026-11-05. The user has implemented `Trainer` and `compute_loss`. The supplied-MSE test now executes and fails numerically: expected scalar loss `4.0`, observed `1.0`, because `compute_loss` passes raw inputs to the loss function without calling the model. Numerical Red is confirmed; Green has not been established. The supplied-L1 case remains pending until the MSE case passes.
+Completed and verified on 2026-11-05. The user's `Trainer.compute_loss` now runs the model before applying the externally supplied loss function. Both agreed scalar-loss cases pass: MSE returns approximately `4.0`, and L1 returns approximately `2.0`. MSE previously had a confirmed numerical Red; L1 passed on its first run against the existing implementation. Gradient behavior remains for task 002.
 
 The filename is retained to preserve existing links. "Kernel" in this project means an operation implementation such as matmul or attention. The earlier training-computation kernel interface is withdrawn; this task does not implement an operation kernel.
 
@@ -57,28 +57,25 @@ MSE and L1 are test inputs, not built-in training choices. These single-element 
 
 ## Next Actions
 
-1. The user updates `compute_loss` to call the model with inputs and pass its predictions to the supplied loss function. Numerical Red has been confirmed; production changes remain user-owned.
-2. Rerun `./test.sh tests/unit/core/test_trainer_loss.py` and report Green only if the numerical assertion passes.
-3. After the MSE case passes, add the supplied-L1 case as the next small TDD step to verify that the externally supplied loss function controls the result.
-4. Once both cases pass, record task 001 as complete and move to task 002 for gradient verification.
+1. Begin task 002: verify that backward through the supplied-MSE loss produces model weight gradient approximately `-4.0` for the same fixed example. No new production interface is required.
+2. Suggested user-owned cleanup: call `self.model(inputs)` instead of `self.model.forward(inputs)` so that execution uses the standard `nn.Module` call path. The task 001 tests verify loss values, not model hooks.
 
 ## Test Evidence
 
 - Convenient runner: `./test.sh tests/unit/core/test_trainer_loss.py`. With no arguments, `./test.sh` runs all tests. The user approved this script; it uses the existing virtual environment and installs no dependencies. See the root README for usage.
-- Test command: `./test.sh tests/unit/core/test_trainer_loss.py`.
-- Failing case: `test_compute_loss_uses_supplied_mse_loss`; collection succeeds and the numerical assertion executes.
-- Expected result: A zero-dimensional `torch.Tensor` approximately equal to `4.0` with supplied MSE loss, using `rtol=1e-6` and `atol=1e-6`.
-- Observed result: Exit code 1, `1 failed, 1 warning`. The scalar-tensor assertions pass, but the numerical assertion reports `Expected 4.0 but got 1.0`.
-- Failure cause: `compute_loss` currently returns `self.loss_fn(inputs, targets)`, computing `(1 - 2)^2 = 1`. The agreed behavior calls the zero-weight model first and computes `(0 - 2)^2 = 4` from predictions. This confirms the intended numerical Red.
-- Environment: Python 3.14.6, torch 2.15.0, pytest 9.2.0. Pytest was initially absent and became available during this session after the user elected to prepare it. The agent did not install packages or modify dependency/test configuration. The command uses `PYTHONPATH=src` because Upwash is not installed in the environment.
-- Additional output: PyTorch warned that NumPy is unavailable; the test executes and fails on the numerical assertion independently of that warning. No NumPy dependency has been added by the agent.
-- Next action: User fixes the production forward/loss computation, then the agent verifies the MSE case. The L1 test has not yet been written or run; no tests have passed.
+- MSE verification before adding L1: `./test.sh tests/unit/core/test_trainer_loss.py` exited 0 with `1 passed`.
+- Full suite after adding L1: `./test.sh` exited 0 with `2 passed`, no warnings.
+- Passing cases: `test_compute_loss_uses_supplied_mse_loss` and `test_compute_loss_uses_supplied_l1_loss`.
+- Expected and verified results: Zero-dimensional `torch.Tensor` values approximately `4.0` with MSE and `2.0` with L1, using `rtol=1e-6` and `atol=1e-6`.
+- Earlier numerical Red: The MSE test exited 1 with `Expected 4.0 but got 1.0` when the implementation passed raw inputs directly to the loss function. The user's subsequent implementation computes predictions first and passes this test. L1 passed immediately; no L1 Red is claimed.
+- Environment: Python 3.14.6, torch 2.15.0, pytest 9.2.0, NumPy 2.5.4. The user supplied pytest and added NumPy; the agent did not install packages or change dependency configuration. `test.sh` supplies `PYTHONPATH=src` and uses the existing virtual environment.
+- Remaining verification: Backward and model gradients have not been tested. Task 001 is complete within its scalar-loss scope; task 002 is next.
 
 ### Earlier Runner Verification (2026-11-05, Before the User's Implementation)
 
 - `sh -n test.sh`: passed shell syntax validation.
-- `./test.sh`: exit 2, the same missing-`Trainer` collection error described above.
-- `../test.sh tests/unit/core/test_trainer_loss.py -k 'compute_loss' -v` from `tests/`: exit 2, the same collection error. Project-root resolution and argument forwarding worked; the selected test body could not execute.
+- `./test.sh`: exit 2, `ImportError: cannot import name 'Trainer' from 'upwash.core.trainer'` before the production class existed.
+- `../test.sh tests/unit/core/test_trainer_loss.py -k 'compute_loss' -v` from `tests/`: exit 2, the same collection error. Project-root resolution and argument forwarding worked; the selected test body could not execute at that stage.
 - Absolute-path invocation with `--help` from `/private/tmp`: exit 0, pytest help displayed.
 - Temporary isolated copies verified exit 1 and a clear message for a missing `.venv/bin/python` and for simulated pytest import failure. The actual project environment was not modified.
 - These are runner checks, not numerical Red or Green for loss computation.
