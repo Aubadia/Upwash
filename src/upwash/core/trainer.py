@@ -1,14 +1,6 @@
 import torch
 
-class TrainingState:
-    def __init__(self):
-        self.global_step = 0
-
-    def set_state(self, name: str, value):
-        setattr(self, name, value)
-        
-    def get_state(self, name: str):
-        return getattr(self, name)
+from upwash.core.state import TrainingState
 
 class Trainer:
     def __init__(self, model: torch.nn.Module, loss_fn, optimizer):
