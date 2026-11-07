@@ -4,11 +4,13 @@ Last updated: 2026-11-07 (Asia/Taipei).
 
 ## Resume Here
 
-Read [the architecture](../docs/Architecture.md), [the Trainer goal](../docs/Trainer.md), and [the latest task](003-model-forward-hooks.md), then inspect relevant source and tests. Verify this record against the checkout before proceeding.
+Read [the architecture](../docs/Architecture.md), [the Trainer goal](../docs/Trainer.md), and [the latest task](004-empty-batches.md), then inspect relevant source and tests. Verify this record against the checkout before proceeding.
 
 ## Current Position
 
-Current task: [003 — Model forward hooks](003-model-forward-hooks.md). The new test exercises the existing documented `model(inputs)` behavior. Targeted command `./test.sh tests/unit/core/test_trainer_loss.py::test_compute_loss_uses_output_modified_by_model_forward_hook` failed (`1 failed in 2.02s`); `./test.sh` returned `1 failed, 5 passed in 2.04s`. Expected hook-modified loss `1`, observed `4`, because direct `.forward(inputs)` bypasses the model hook. Intended Red is confirmed. Next: the user changes invocation to `self.model(inputs)`, then verify Green. Production code was not modified by the agent.
+Latest task: [003 — Model forward hooks](003-model-forward-hooks.md), now Green. The current implementation calls `self.model(inputs)`. Verified on 2026-11-07: `./test.sh tests/unit/core/test_trainer_loss.py::test_compute_loss_uses_output_modified_by_model_forward_hook` returned exit 0, `1 passed in 2.10s`; `./test.sh` returned exit 0, `6 passed in 1.96s`. The hook-modified loss is accepted and previous scenarios remain Green. Production code was not modified by the agent.
+
+Latest completed task: [004 — Reject empty batches](004-empty-batches.md), now Green. With explicit user authorization, the agent replaced the truthiness guard with a zero-step check after traversal. Empty lists and empty iterators now raise `ValueError` without parameter updates. `./test.sh tests/unit/core/test_trainer_empty_batches.py` returned exit 0, `2 passed in 2.03s`; `./test.sh` returned exit 0, `8 passed in 1.91s`. Existing nonempty iterator training remains Green. Next: agree on the next behavior before adding tests. Returned-state snapshot and error-state semantics remain deferred.
 
 ### Previous Task Verification
 
@@ -22,7 +24,7 @@ Verified on 2026-11-07:
 - The earlier `NoneType + int` counter regression is resolved. Its prior full-suite result was `3 failed, 2 passed in 1.85s`; the repeated-call test then failed before reaching its assertions.
 - Empty-input, error-state, and returned-state snapshot semantics remain deferred. Model invocation and hook behavior are now covered by task 003 above.
 
-The user writes production code. The agent supports design, tests, failure analysis, and documentation under [AGENTS.md](../AGENTS.md). No dependencies or test configuration were changed.
+The user normally writes production code. The agent supports design, tests, failure analysis, and documentation under [AGENTS.md](../AGENTS.md); the user explicitly authorized the task 004 production fix. No dependencies or test configuration were changed.
 
 ## Completed Route
 
@@ -30,6 +32,8 @@ The user writes production code. The agent supports design, tests, failure analy
 | --- | --- | --- | --- |
 | [001](001-kernel-loss.md) | Compute scalar loss using supplied MSE and L1 loss functions. | Expected values `4` and `2`; tests now supply the required optimizer. | Green. Original API description is historical. |
 | [002](002-minimal-training-loop.md) | Run a minimal training loop. | Real updates, fresh gradients, training mode, and per-call progress across successive calls. | Green, including repeated-call progress; supersedes former tasks 002–005. |
+| [003](003-model-forward-hooks.md) | Use model output modified by a forward hook. | Hook-modified loss `1`; full suite `6 passed`. | Green. |
+| [004](004-empty-batches.md) | Reject iterables that yield no batches. | Empty list and iterator raise `ValueError`; full suite `8 passed`. | Green. |
 
 Custom operation kernels are not needed for this milestone. No Hugging Face differential compatibility requirement has been selected.
 

@@ -37,6 +37,9 @@ class Trainer:
             loss.backward()
             self.optimizer.step()
             steps = steps + 1
+
+        if steps == 0:
+            raise ValueError("batches cannot be empty")
         
         self.state.set_state("global_step", steps) 
 
