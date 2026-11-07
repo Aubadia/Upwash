@@ -1,14 +1,44 @@
 import torch
 
+class TrainingState:
+    def __init__(self):
+        self.global_step = 0
+
+    def set_state(self, name: str, value):
+        setattr(self, name, value)
+        
+    def get_state(self, name: str):
+        return getattr(self, name)
+
 class Trainer:
-    def __init__(self, model: torch.nn.Module, loss_fn):
+    def __init__(self, model: torch.nn.Module, loss_fn, optimizer):
+        self.state = TrainingState()
         self.model = model
         self.loss_fn = loss_fn
+        self.optimizer = optimizer
 
     def compute_loss(
             self, 
             inputs: torch.Tensor, 
             targets: torch.Tensor
     ) -> torch.Tensor:
-        out = self.model.forward(inputs)
+        out = self.model(inputs)
         return self.loss_fn(out, targets)
+
+    def train(self, batches) -> TrainingState:
+        self.model.train() 
+       
+        self.state.set_state("global_step", 0)
+        steps = 0
+        
+        for input, target in batches:
+            self.optimizer.zero_grad()
+            loss = self.compute_loss(input, target)
+            loss.backward()
+            self.optimizer.step()
+            steps = steps + 1
+        
+        self.state.set_state("global_step", steps) 
+
+        return self.state
+        

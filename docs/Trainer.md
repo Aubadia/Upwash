@@ -23,7 +23,7 @@ trainer = Trainer(model=model, loss_fn=loss_fn)
 loss = trainer.compute_loss(inputs, targets)
 ```
 
-Trainer holds the model and externally supplied loss function. `compute_loss` calls `model(inputs)` and returns `loss_fn(predictions, targets)` as a scalar tensor, preserving its gradient path. This is the first supervised calling convention. The first training loop will unpack `(inputs, targets)` batches; other formats are deferred until required. Optimizer injection will be agreed in the update task. Do not introduce a replacement training-step abstraction merely to preserve the previous constructor shape.
+Trainer holds the model and externally supplied loss function. `compute_loss` calls `model(inputs)` and returns `loss_fn(predictions, targets)` as a scalar tensor, preserving its gradient path. This is the first supervised calling convention. The first training loop will unpack `(inputs, targets)` batches; other formats are deferred until required. Optimizer injection is agreed in [task 002](../roadmap/002-minimal-training-loop.md): `Trainer(model=model, loss_fn=loss_fn, optimizer=optimizer)` followed by `state = trainer.train(batches)`. Following the user’s correction, the optimizer argument is required, including for loss-only tests. Do not introduce a replacement training-step abstraction merely to preserve the previous constructor shape.
 
 ## Agreed Behavior
 
@@ -64,7 +64,7 @@ For numerical test examples, use a bias-free model `prediction = w * x`, initial
 
 ## Deferred Decisions
 
-Multiple epochs, device management, gradient accumulation, mixed precision, schedulers, logging, evaluation, checkpointing, distributed training, and custom operation kernels are outside this first milestone. Repeated-call state semantics and empty-input/error behavior need explicit agreement when their tasks are reached. Future optimizers requiring repeated loss evaluation may require different interactions.
+Multiple epochs, device management, gradient accumulation, mixed precision, schedulers, logging, evaluation, checkpointing, distributed training, and custom operation kernels are outside this first milestone. Repeated calls count completed updates separately (`1 → 1` for two one-batch calls), while model parameters continue from their trained values. Returned-state snapshot semantics and empty-input/error behavior need explicit agreement when their tasks are reached. Future optimizers requiring repeated loss evaluation may require different interactions.
 
 No Hugging Face compatibility behavior or reference version has been selected. Before a differential comparison, agree on its scope and record the exact reference version according to AGENTS.md.
 
