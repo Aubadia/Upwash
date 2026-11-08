@@ -1,12 +1,20 @@
 # Implementation Progress
 
-Last updated: 2026-11-08 (Asia/Taipei).
+Last updated: 2026-11-09 (Asia/Taipei).
 
 ## Resume Here
 
-Read [the architecture](../docs/Architecture.md), [the Trainer goal](../docs/Trainer.md), and [the latest task](006-fit-linear-regression.md), then inspect relevant source and tests. Verify this record against the checkout before proceeding.
+Read [the architecture](../docs/Architecture.md), [the Trainer goal](../docs/Trainer.md), and [the current task](010-metric-logger.md), then inspect relevant source and tests. Verify this record against the checkout before proceeding.
 
 ## Current Position
+
+Latest discovery on 2026-11-09: the user supplied Flock's GitHub repository. Official guides confirm ordinary wandb SDK logging, explicit steps, completion, and offline sync; the earlier HTTP 403 discovery blocker is resolved. Revised proposal: `MemoryLogger` plus one `WandbLogger` for either destination, optional composition. Task 014 verifies Flock instead of implementing a separate adapter. Exact SDK/server versions and simultaneous multi-host behavior remain unverified. Next: agree on revised API and logging-step/lifecycle semantics before the first 010 Red. No tests were run during this documentation-only investigation; the existing `25 passed` result is from 2026-11-08. Earlier scope notes below describe the investigation before this source discovery.
+
+Current task: [010 — Minimal metric logger](010-metric-logger.md), awaiting API agreement before its first test. Task [009](009-training-config.md) is Green for the tested Python-float scope. The user requested Builder, Config, and Logger planning with new numbering starting at 009. Tasks 001–006 keep their existing numbers; 007–008 are unused. Logger and later task APIs remain proposals.
+
+Scope update on 2026-11-09: the user requires W&B and Flock logging. Task 010 now proposes a common logging interaction with MemoryLogger and optional fan-out; backend adapters are planned in 013–014. W&B SDK research shows that committed history steps cannot reset between Trainer calls; task 011 proposes cumulative logging steps while retaining agreed per-call `state.global_step`. This proposal awaits agreement. Flock documentation retrieval returned HTTP 403; its actual API remains unverified. Next action: agree the shared interface and step/lifecycle proposal, obtain an accessible Flock SDK example, then begin the first task 010 Red. No new tests run during this documentation-only scope update; the `25 passed` result below is from 2026-11-08.
+
+Checkout verification on 2026-11-08: the user's finiteness check passed the full suite, `./test.sh` → exit 0, `25 passed in 2.02s`. Config tests verify composition, finite positive and zero values, negative rejection, and rejection of NaN and both infinities. Broader input-type behavior remains deferred. `builder.py` and `core/logger.py` remain empty. No agent production edits, dependency changes, or test configuration changes were made. Next action: agree on `Logger.log(metrics, *, step)` and the observable record representation, then write one failing test. No Logger Red has been attempted.
 
 Latest completed task: [006 — Fit a small linear regression end to end](006-fit-linear-regression.md). A verification scenario, not a new feature: 30 `train(loader)` calls over `y = 3x + 1` reach weight approximately `3` and bias approximately `1`. Passed on first run with no production changes; no Red is claimed. A scratch `lr=0.0` copy failed as expected. Full suite in Docker: `19 passed` on 2026-11-08. Next minimum-viable gap: training loss is not observable from `train()` (Logger area).
 
@@ -31,6 +39,19 @@ Verified on 2026-11-07:
 - Empty-input, error-state, and returned-state snapshot semantics remain deferred. Model invocation and hook behavior are now covered by task 003 above.
 
 The user normally writes production code. The agent supports design, tests, failure analysis, and documentation under [AGENTS.md](../AGENTS.md); the user explicitly authorized the task 004 production fix. No dependencies or test configuration were changed.
+
+## Planned Route
+
+| Task | Proposed behavior | Status / next action |
+| --- | --- | --- |
+| [009](009-training-config.md) | Composed settings, starting with optimizer learning rate. | Green for tested float scope; full suite `25 passed`. |
+| [010](010-metric-logger.md) | Shared metric logging interaction, MemoryLogger, and optional fan-out. | Current: revised proposal awaiting agreement. |
+| [011](011-training-loss-logging.md) | Trainer emits the loss used for each completed update. | Proposed: cumulative logging steps; retain per-call state steps. |
+| [012](012-build-trainer.md) | Construct optimizer from config and wire Trainer with supplied runtime objects. | Proposed: validate wiring with real parameter updates and logged loss. |
+| [013](013-wandb-logger.md) | Adapt scalar logging to a supplied W&B run. | Agree API, pinned SDK version, and optional dependency setup. |
+| [014](014-flock-logger.md) | Verify the shared wandb adapter against Flock. | SDK compatibility documented; exact versions and executable integration pending. |
+
+Builder comes last so it composes verified interfaces. Each task uses small Red/Green steps; API proposals must be agreed before tests are written. No Hugging Face class replacement or differential compatibility scope is selected for this route.
 
 ## Completed Route
 
