@@ -1,40 +1,54 @@
 # Implementation Progress
 
-Last updated: 2026-11-08 (Asia/Taipei).
+Last updated: 2026-11-09 (Asia/Taipei).
 
 ## Resume Here
 
-Read [the architecture](../docs/Architecture.md), [the Trainer goal](../docs/Trainer.md), and [the latest task](008-write-token-shard.md), then inspect relevant source and tests. Verify this record against the checkout before proceeding.
+Read [Architecture.md](../docs/Architecture.md), [Trainer.md](../docs/Trainer.md), and [012 — Shared wandb SDK adapter](012-wandb-logger.md), then inspect the relevant source and tests. The initial MemoryLogger batch interface is agreed; the task 011 Builder interface with optional logger injection is also agreed; remote adapter proposals still need agreement before tests. The user writes production code; the agent supports design, tests, failure analysis, and documentation under [AGENTS.md](../AGENTS.md).
 
 ## Current Position
 
-Current task: [008 — Tokenize documents into a token shard](008-write-token-shard.md), continuing on branch `feat/load-dataset`. `write_token_shard` excludes dev-set ids, appends EOS per document, and writes `uint32` tokens atomically. The user implemented it; Green on 2026-11-08 with `26 passed`. A manual run with the real Llama 3 tokenizer, `dev-ids.txt`, and 1,000 FineWeb-Edu documents produced 1,037,837 tokens and an exact decode round trip. Wiring was folded into this task: `load_dev_ids` and `prepare_token_shards` (one `.bin` plus sidecar `.json` per parquet file, skipping completed shards). The user implemented both; Green on 2026-11-08 (`5 passed`; full suite `31 passed`). The user wrote `scripts/prepare_fineweb.py` (all revisions pinned, including `dev-ids.txt` at `2484afe000a6fdf442ba2396391a3bec12644903`). One real file, `sample/10BT/000_00000.parquet`, produced 726,000 documents and 731,876,929 tokens in about 31 minutes. The agent confirmed that the shard size and EOS count match the summary. Next: rerun to confirm the completed shard is skipped, then commit and open the pull request. Task 009 (`PackedTokenDataset`, reading token files for training) follows in a separate pull request.
+Configuration (009), MemoryLogger (010), and Builder (011) are implemented and verified Green. Current task is [012 — Shared wandb SDK adapter](012-wandb-logger.md): agree on adapter API, exact SDK version, and dependency/test setup before the first test. The same adapter is planned for W&B or Flock; SDK compatibility and actual server delivery remain unverified.
 
-Current task: [007 — Load parquet datasets from the Hugging Face Hub](007-load-dataset.md), on branch `feat/load-dataset` after PR #1 merged. The user added `huggingface-hub` and `pyarrow`; `uv sync --locked` and the existing suite (`19 passed`) succeeded. Green on 2026-11-08: the user implemented `load_dataset` in `core/data.py`; the full suite returned `23 passed`. Next: a one-off manual check against a real FineWeb-Edu file, and confirming the exact Llama 3 tokenizer repo with the lab. Evaluation sets are scored by `flock eval` and are out of scope.
+Builder constructs the configured optimizer for the supplied model and passes through an optional logger. Trainer stores `trainer.logger`; metric selection, timing, and actual logging remain with the user's training logic. Two real SGD integration cases verify different learning rates update the supplied model and training emits no automatic metrics. `core/contracts.py` remains empty; introduce shared typing when a tested interaction needs it. Tasks 012–013 have no tests or implementation. The agent changed only tests and documentation during this step.
 
-Latest completed task: [006 — Fit a small linear regression end to end](006-fit-linear-regression.md). A verification scenario, not a new feature: 30 `train(loader)` calls over `y = 3x + 1` reach weight approximately `3` and bias approximately `1`. Passed on first run with no production changes; no Red is claimed. A scratch `lr=0.0` copy failed as expected. Full suite in Docker: `19 passed` on 2026-11-08. Next minimum-viable gap: training loss is not observable from `train()` (Logger area).
+## Current Verification — 2026-11-09
 
-Latest completed task: [005 — Minimal data loader](005-data-loader.md), Green. The user implemented `TensorDataset` and `DataLoader(dataset, batch_size=1, drop_last=False)` in `core/data.py`; `Trainer.train` consumes the loader unchanged. Full suite in Docker (`PYTHONPATH=src uv run pytest -q`): `18 passed` on 2026-11-08. Shuffle, custom collation, and invalid `batch_size` handling remain deferred.
+| Command | Result | Interpretation |
+| --- | --- | --- |
+| `./test.sh tests/unit/test_training_config.py` | Exit 0; `6 passed in 0.01s`. | Current Config tests Green: composition, positive/zero values, negative rejection, NaN and both infinities. Broader input-type behavior is deferred. |
+| `./test.sh tests/unit/test_builder.py tests/integration/test_built_trainer.py` | Exit 0; `4 passed in 2.05s`. | Construction, logger omission, real SGD updates at lr 0.1/0.05, and no automatic logging verified. |
+| `./test.sh` | Exit 0; `46 passed in 2.11s`. | Current combined suite Green. |
 
-Environment note: one contributor runs tests in a Linux Docker container because torch 2.15.0 has no Intel macOS wheel; `./test.sh` remains the runner for native `.venv` environments.
+Earlier environment and optional-logger failures are resolved. The two new integration cases passed on their first run; no Red is claimed for already-supported behavior. Detailed historical results remain in task files. The agent changed no dependencies or test configuration.
 
-Latest task: [003 — Model forward hooks](003-model-forward-hooks.md), now Green. The current implementation calls `self.model(inputs)`. Verified on 2026-11-07: `./test.sh tests/unit/core/test_trainer_loss.py::test_compute_loss_uses_output_modified_by_model_forward_hook` returned exit 0, `1 passed in 2.10s`; `./test.sh` returned exit 0, `6 passed in 1.96s`. The hook-modified loss is accepted and previous scenarios remain Green. Production code was not modified by the agent.
+## Route 010–013
 
-Latest completed task: [004 — Reject empty batches](004-empty-batches.md), now Green. With explicit user authorization, the agent replaced the truthiness guard with a zero-step check after traversal. Empty lists and empty iterators now raise `ValueError` without parameter updates. `./test.sh tests/unit/core/test_trainer_empty_batches.py` returned exit 0, `2 passed in 2.03s`; `./test.sh` returned exit 0, `8 passed in 1.91s`. Existing nonempty iterator training remains Green. Next: agree on the next behavior before adding tests. Returned-state snapshot and error-state semantics remain deferred.
+| Task | Deliverable | Dependencies | Next action |
+| --- | --- | --- | --- |
+| [010](010-metric-logger.md) | Shared logging interaction and MemoryLogger. | 009 complete. | Complete for four tested memory behaviors; full suite `42 passed`. |
+| [011](011-build-trainer.md) | Build an optimizer from Config and wire Trainer. | 009 complete. | Complete; four Builder cases pass, full suite `46 passed`. |
+| [012](012-wandb-logger.md) | One wandb SDK adapter for W&B or Flock. | 010; scheduled after 011. | Current: agree adapter API, exact SDK version, and optional dependency setup. |
+| [013](013-flock-logger.md) | Verify actual delivery to Flock through that adapter. | 012. | Select pinned SDK/server versions and an agreed integration environment. |
 
-### Previous Task Verification
+Each task uses small Red/Green steps. Builder constructs the optimizer and Trainer and passes through an optional logger; metric emission stays with the caller. No Hugging Face class replacement or differential compatibility scope is selected for this route.
 
-The user agreed on per-call progress and fixed the counter initialization: `train()` resets progress and initializes the local `steps` to integer zero. The agent did not modify production code.
+## Shared Design Proposals
 
-Verified on 2026-11-07:
+The initial batch logging interface and memory record representation are agreed. The caller owns logging policy; remote adapter details remain proposals:
 
-- `./test.sh tests/integration/test_minimal_training_loop.py::test_train_counts_steps_per_call_and_continues_updating_parameters`: exit 0, `1 passed in 2.02s`.
-- `./test.sh`: exit 0, `5 passed in 2.01s`.
-- Two successive one-batch calls return immediate `global_step` values `1 → 1`, with real SGD weights approximately `0.4 → 0.72`. Existing scalar-loss, training-mode, and fresh-gradient scenarios remain Green.
-- The earlier `NoneType + int` counter regression is resolved. Its prior full-suite result was `3 failed, 2 passed in 1.85s`; the repeated-call test then failed before reaching its assertions.
-- Empty-input, error-state, and returned-state snapshot semantics remain deferred. Model invocation and hook behavior are now covered by task 003 above.
+- All backends support `log(metrics, *, step)`; only MemoryLogger exposes `records`.
+- The calling training logic supplies detached scalar metrics, chooses logging frequency, and manages steps suitable for the destination. Returned `state.global_step` remains per-call; no automatic cumulative Trainer logging counter is planned.
+- Caller owns remote run initialization, host/authentication settings, and completion. Builder accepts optional `logger=None` and injects it unchanged into Trainer, which stores `trainer.logger`; neither initializes or finalizes remote runs, and core imports no concrete remote SDK.
+- One caller-owned fresh run is the first remote scenario. Resume, shared runs, CompositeLogger, simultaneous multi-host delivery, and failure/retry policies require later requirements and agreement.
 
-The user normally writes production code. The agent supports design, tests, failure analysis, and documentation under [AGENTS.md](../AGENTS.md); the user explicitly authorized the task 004 production fix. No dependencies or test configuration were changed.
+Offline SDK tests establish serialization; only a real server check establishes delivery. Flock evidence and source links live in [013](013-flock-logger.md), SDK adapter evidence in [012](012-wandb-logger.md). Exact versions must be recorded before executable compatibility checks.
+
+## Data Pipeline Handoff
+
+Tasks [007](007-load-dataset.md) and [008](008-write-token-shard.md) retain their existing scope and records. Task 008 includes dev-id loading, resumable per-file shard generation, and `scripts/prepare_fineweb.py`. A recorded real-file run produced 726,000 documents and 731,876,929 tokens with matching shard-size and EOS-count checks. Its review updates record one snapshot request, shared parquet reading, and explicit little-endian `"<u4"` tokens, with historical Docker full-suite result `32 passed`.
+
+The last recorded task 008 action is to update its pull request, then rebase the packed-token-dataset branch and use the same byte order; this reorganization does not verify remote PR or branch status. Tasks 001–010 keep their numbers; Builder, the wandb adapter, and Flock verification are renumbered consecutively as 011–013. Older data-pipeline notes reserved 009 for PackedTokenDataset; that future work needs a new number before adding an entry, since 009 is Config.
 
 ## Completed Route
 
@@ -47,10 +61,13 @@ The user normally writes production code. The agent supports design, tests, fail
 | [005](005-data-loader.md) | Minimal dataset and loader consumed by `Trainer.train`. | Ordered batches `[2, 2, 1]`, `drop_last`, `len` including divisible cases, repeated iteration, trained weight `0.72`. | Green: full suite `18 passed`. |
 | [006](006-fit-linear-regression.md) | Fit `y = 3x + 1` end to end with the existing framework. | Final loss below `1e-4`; weight and bias within `1e-3` of `3` and `1`. | Verified: `19 passed`; no production change needed. |
 | [007](007-load-dataset.md) | Read selected columns from pinned parquet files on the Hugging Face Hub, reusing the local cache. | Matching files in sorted order, requested columns, `ValueError` when nothing matches, pinned snapshot request. | Green: `23 passed`. |
-| [008](008-write-token-shard.md) | Exclude dev ids, tokenize, append EOS, write a `uint32` token shard. | Exact token sequence, counts, no partial file on failure. | Green (`26 passed`); manual real-data check: 1,000 documents, 1,037,837 tokens, exact decode round trip. Wiring (`load_dev_ids`, `prepare_token_shards` with resumable per-file shards): Green, `31 passed`. |
+| [008](008-write-token-shard.md) | Exclude dev ids, tokenize, append EOS, write a `uint32` token shard. | Exact token sequence, counts, no partial file on failure. | Green (`26 passed`); manual real-data check: 1,000 documents, 1,037,837 tokens, exact decode round trip. Wiring: `31 passed`; later snapshot-request and explicit little-endian review changes: `32 passed` in Docker. |
+| [009](009-training-config.md) | Composed optimizer settings with finite nonnegative learning rate. | Six config cases pass locally on 2026-11-09; prior branch-local full suite `25 passed`. | Green for tested Python-float scope. |
+| [010](010-metric-logger.md) | Batch scalar metrics in memory, ordered independent records, input isolation. | Four logger tests; full suite `42 passed` on 2026-11-09. | Green for tested memory scope. |
+| [011](011-build-trainer.md) | Build configured optimizer and Trainer with optional logger storage. | Two unit cases and two real-SGD integration cases; full suite `46 passed`. | Green; no automatic metric emission. |
 
-Custom operation kernels are not needed for this milestone. No Hugging Face differential compatibility requirement has been selected.
+Detailed implementation iterations, test commands, and failures remain in each task document. Returned-state snapshot semantics and partial-failure recovery remain deferred. Custom operation kernels are not required for this milestone.
 
 ## Maintaining This Record
 
-After meaningful changes, record the actual implementation, test commands and outcomes, blockers, and next action. Distinguish verified behavior from untested expectations and historical results.
+Keep the current task, observed results, blockers, and next action here. Keep detailed evidence in task files. Label API proposals, implemented behavior, historical results, and current verification separately. Do not count an unrun test as Green or an environment failure as the intended Red. Update the roadmap after each meaningful TDD step.
