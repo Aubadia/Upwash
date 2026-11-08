@@ -58,7 +58,7 @@ def read_parquet_rows(path, columns):
 class PackedTokenDataset:
     def __init__(self, path, seq_len):
         self.seq_len = seq_len
-        self.tokens=np.memmap(path, dtype=np.uint32, mode="r")
+        self.tokens=np.memmap(path, dtype="<u4", mode="r")
 
     def __len__(self):
         return (len(self.tokens) -1 ) //self.seq_len

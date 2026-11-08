@@ -25,7 +25,7 @@ def test_tiny_language_model_learns_next_token_from_a_packed_shard(tmp_path):
     # A repeating sequence 0..7: the next token is always (t + 1) % 8, so a model
     # that looks only at the current token can learn it exactly.
     path = tmp_path / "shard.bin"
-    np.asarray(list(range(VOCAB_SIZE)) * 8 + [0], dtype=np.uint32).tofile(path)  # 65 tokens
+    np.asarray(list(range(VOCAB_SIZE)) * 8 + [0], dtype="<u4").tofile(path)  # 65 tokens
 
     dataset = PackedTokenDataset(path, seq_len=SEQ_LEN)
     loader = DataLoader(dataset, batch_size=BATCH_SIZE)

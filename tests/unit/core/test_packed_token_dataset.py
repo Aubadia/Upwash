@@ -6,8 +6,8 @@ from upwash.core.data import PackedTokenDataset
 
 
 def write_tokens(path, tokens):
-    """Writes a token shard in the format write_token_shard produces: raw uint32 ids."""
-    np.asarray(tokens, dtype=np.uint32).tofile(path)
+    """Writes a token shard in the format write_token_shard produces: raw little-endian uint32 ids ("<u4")."""
+    np.asarray(tokens, dtype="<u4").tofile(path)
     return path
 
 

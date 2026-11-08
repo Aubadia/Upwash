@@ -70,4 +70,13 @@ An agent-run read-only check on `.cache/tokens/sample/10BT/000_00000.bin` from t
 - `DataLoader(batch_size=8)` yields an `(8, 4096)` batch.
 - Opening the 2.9 GB shard and reading these samples took well under a second, so the memmap does not load the file.
 
+## Explicit Byte Order — 2026-11-09
+
+This follows the task 008 review, which made the shard format explicit little-endian.
+
+- The branch was rebased onto the updated `feat/load-dataset` (`9c3fe8c`) without conflicts.
+- The user changed the memmap to `dtype="<u4"`, and the tests now write their shards with `"<u4"`.
+- Full suite (Docker): `40 passed`.
+- No Red is claimed: on little-endian hardware, native `uint32` and `"<u4"` are identical.
+
 Status: complete for single-shard, in-order training data. The deferred items above are next for the data area. A real model, optimizer schedule, and device handling are outside this task.
