@@ -1,12 +1,18 @@
 # Implementation Progress
 
-Last updated: 2026-11-07 (Asia/Taipei).
+Last updated: 2026-11-08 (Asia/Taipei).
 
 ## Resume Here
 
-Read [the architecture](../docs/Architecture.md), [the Trainer goal](../docs/Trainer.md), and [the latest task](004-empty-batches.md), then inspect relevant source and tests. Verify this record against the checkout before proceeding.
+Read [the architecture](../docs/Architecture.md), [the Trainer goal](../docs/Trainer.md), and [the latest task](006-fit-linear-regression.md), then inspect relevant source and tests. Verify this record against the checkout before proceeding.
 
 ## Current Position
+
+Latest completed task: [006 — Fit a small linear regression end to end](006-fit-linear-regression.md). A verification scenario, not a new feature: 30 `train(loader)` calls over `y = 3x + 1` reach weight approximately `3` and bias approximately `1`. Passed on first run with no production changes; no Red is claimed. A scratch `lr=0.0` copy failed as expected. Full suite in Docker: `19 passed` on 2026-11-08. Next minimum-viable gap: training loss is not observable from `train()` (Logger area).
+
+Latest completed task: [005 — Minimal data loader](005-data-loader.md), Green. The user implemented `TensorDataset` and `DataLoader(dataset, batch_size=1, drop_last=False)` in `core/data.py`; `Trainer.train` consumes the loader unchanged. Full suite in Docker (`PYTHONPATH=src uv run pytest -q`): `18 passed` on 2026-11-08. Shuffle, custom collation, and invalid `batch_size` handling remain deferred.
+
+Environment note: one contributor runs tests in a Linux Docker container because torch 2.15.0 has no Intel macOS wheel; `./test.sh` remains the runner for native `.venv` environments.
 
 Latest task: [003 — Model forward hooks](003-model-forward-hooks.md), now Green. The current implementation calls `self.model(inputs)`. Verified on 2026-11-07: `./test.sh tests/unit/core/test_trainer_loss.py::test_compute_loss_uses_output_modified_by_model_forward_hook` returned exit 0, `1 passed in 2.10s`; `./test.sh` returned exit 0, `6 passed in 1.96s`. The hook-modified loss is accepted and previous scenarios remain Green. Production code was not modified by the agent.
 
@@ -34,6 +40,8 @@ The user normally writes production code. The agent supports design, tests, fail
 | [002](002-minimal-training-loop.md) | Run a minimal training loop. | Real updates, fresh gradients, training mode, and per-call progress across successive calls. | Green, including repeated-call progress; supersedes former tasks 002–005. |
 | [003](003-model-forward-hooks.md) | Use model output modified by a forward hook. | Hook-modified loss `1`; full suite `6 passed`. | Green. |
 | [004](004-empty-batches.md) | Reject iterables that yield no batches. | Empty list and iterator raise `ValueError`; full suite `8 passed`. | Green. |
+| [005](005-data-loader.md) | Minimal dataset and loader consumed by `Trainer.train`. | Ordered batches `[2, 2, 1]`, `drop_last`, `len` including divisible cases, repeated iteration, trained weight `0.72`. | Green: full suite `18 passed`. |
+| [006](006-fit-linear-regression.md) | Fit `y = 3x + 1` end to end with the existing framework. | Final loss below `1e-4`; weight and bias within `1e-3` of `3` and `1`. | Verified: `19 passed`; no production change needed. |
 
 Custom operation kernels are not needed for this milestone. No Hugging Face differential compatibility requirement has been selected.
 
