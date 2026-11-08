@@ -2,6 +2,7 @@ import torch
 from huggingface_hub import snapshot_download
 from pathlib import Path
 import pyarrow.parquet as pq
+import numpy as np
 
 
 
@@ -60,3 +61,24 @@ def load_dataset(repo_id, *, revision, data_files, columns, cache_dir=None
             for row in batch.to_pylist():
                 yield row
         
+
+def write_token_shard(rows, *, tokenize, eos_id, exclude_ids, output_path):
+    tmp_path = Path(str(output_path) + ".tmp")
+    num_docs = 0
+    num_excluded = 0
+    num_tokens = 0
+
+    with open(tmp_path, "wb") as f:
+        for row in rows:
+            if row["id"] in exclude_ids:
+                num_excluded += 1
+                continue
+            ids = tokenize(row["text"]) +[eos_id]
+            data = np.asarray(ids, dtype=np.uint32).tobytes()
+            f.write(data)
+            num_docs+= 1
+            num_tokens += len(ids)
+    
+    tmp_path.replace(output_path)
+    
+    return {"num_docs": num_docs, "num_excluded": num_excluded, "num_tokens": num_tokens}

@@ -12,6 +12,8 @@ dependencies = [
     "numpy>=2.5.4",
     "pyarrow>=26.0.1",
     "pytest>=9.2.0",
+    "tokenizer>=3.7.0",
+    "tokenizers>=0.23.3",
     "torch>=2.15.0",
 ]
 
