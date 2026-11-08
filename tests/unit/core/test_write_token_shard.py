@@ -34,7 +34,7 @@ def test_write_token_shard_writes_uint32_tokens_with_eos_after_each_kept_documen
     # "hi" -> 104, 105; "yo!" -> 121, 111, 33; each followed by EOS; "xx" excluded.
     expected = [104, 105, EOS_ID, 121, 111, 33, EOS_ID]
     assert output_path.stat().st_size == len(expected) * 4  # 4 bytes per uint32 token
-    np.testing.assert_array_equal(np.fromfile(output_path, dtype=np.uint32), expected)
+    np.testing.assert_array_equal(np.fromfile(output_path, dtype="<u4"), expected)
 
 
 def test_write_token_shard_returns_document_and_token_counts(tmp_path):

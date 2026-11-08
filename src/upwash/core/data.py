@@ -48,7 +48,12 @@ class DataLoader:
             return len(self.dataset) // self.batch_size
         else:
             return (len(self.dataset) + self.batch_size -1) // self.batch_size
-            
+
+
+def read_parquet_rows(path, columns):
+    for batch in pq.ParquetFile(path).iter_batches(columns=columns):
+        for row in batch.to_pylist():
+            yield row
 
 def load_dataset(repo_id, *, revision, data_files, columns, cache_dir=None
                  , download=snapshot_download):
@@ -58,12 +63,10 @@ def load_dataset(repo_id, *, revision, data_files, columns, cache_dir=None
         raise ValueError(f"no files match {data_files!r} in {local_dir}")
 
     for path in files:
-        for batch in pq.ParquetFile(path).iter_batches(columns=columns):
-            for row in batch.to_pylist():
-                yield row
-    
+        yield from read_parquet_rows(path, columns)
 
-def load_dev_ids(repo_id, *, revision, filename, cache_dir=None, download=snapshot_download):
+    
+def load_dev_ids(repo_id, *, revision, filename, cache_dir=None, download=snapshot_download) -> set[str]:
     local_dir = download(repo_id, repo_type="dataset", revision=revision, allow_patterns=filename, cache_dir=cache_dir)
     text = (Path(local_dir) / filename).read_text()
     lines = text.splitlines()
@@ -75,7 +78,7 @@ def load_dev_ids(repo_id, *, revision, filename, cache_dir=None, download=snapsh
 
 
 def prepare_token_shards(repo_id, *, revision, data_files, output_dir, tokenize, eos_id, 
-                         exclude_ids, cache_dir=None, download=snapshot_download):
+                         exclude_ids, cache_dir=None, download=snapshot_download) -> dict[str, int]:
     local_dir = download(repo_id, repo_type="dataset", revision=revision, allow_patterns=data_files, cache_dir=cache_dir)
     files = sorted(Path(local_dir).glob(data_files))
 
@@ -88,8 +91,7 @@ def prepare_token_shards(repo_id, *, revision, data_files, output_dir, tokenize,
 
         if not json_path.exists():
             bin_path.parent.mkdir(parents=True, exist_ok=True)
-            rows = load_dataset(repo_id, revision=revision, data_files=str(rel), columns=["id", "text"]
-                                ,cache_dir=cache_dir, download=download)
+            rows = read_parquet_rows(path, ["id", "text"])
             meta = write_token_shard(rows, tokenize=tokenize, eos_id=eos_id, exclude_ids=exclude_ids, output_path=bin_path)
             json_path.write_text(json.dumps(meta))
 
@@ -102,7 +104,7 @@ def prepare_token_shards(repo_id, *, revision, data_files, output_dir, tokenize,
     return total
 
 
-def write_token_shard(rows, *, tokenize, eos_id, exclude_ids, output_path):
+def write_token_shard(rows, *, tokenize, eos_id, exclude_ids, output_path) -> dict[str, int]:
     tmp_path = Path(str(output_path) + ".tmp")
     num_docs = 0
     num_excluded = 0
@@ -114,7 +116,7 @@ def write_token_shard(rows, *, tokenize, eos_id, exclude_ids, output_path):
                 num_excluded += 1
                 continue
             ids = tokenize(row["text"]) +[eos_id]
-            data = np.asarray(ids, dtype=np.uint32).tobytes()
+            data = np.asarray(ids, dtype="<u4").tobytes()
             f.write(data)
             num_docs+= 1
             num_tokens += len(ids)

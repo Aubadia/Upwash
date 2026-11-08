@@ -121,17 +121,35 @@ def test_prepare_token_shards_writes_one_shard_per_matching_parquet_file(tmp_pat
 
     # Each shard mirrors its parquet file's path under output_dir, with a .bin suffix.
     np.testing.assert_array_equal(
-        np.fromfile(output_dir / "sample" / "10BT" / "000.bin", dtype=np.uint32),
+        np.fromfile(output_dir / "sample" / "10BT" / "000.bin", dtype="<u4"),
         [104, 105, EOS_ID],  # "hi"; "xx" excluded
     )
     np.testing.assert_array_equal(
-        np.fromfile(output_dir / "sample" / "10BT" / "001.bin", dtype=np.uint32),
+        np.fromfile(output_dir / "sample" / "10BT" / "001.bin", dtype="<u4"),
         [121, 111, 33, EOS_ID],  # "yo!"
     )
     assert not (output_dir / "sample" / "100BT").exists()
     # Every download request uses the pinned revision.
     assert download.calls
     assert all(call["revision"] == "abc123" for call in download.calls)
+
+
+def test_prepare_token_shards_requests_the_snapshot_once_for_all_files(tmp_path):
+    download = FakeDownload(make_repo(tmp_path / "repo"))
+
+    prepare(tmp_path, download, fake_tokenize)
+
+    # One snapshot request covers every matching file. A request per file would
+    # add one Hub round trip per parquet file (472 for sample/350BT).
+    assert download.calls == [
+        {
+            "repo_id": "org/corpus",
+            "repo_type": "dataset",
+            "revision": "abc123",
+            "allow_patterns": "sample/10BT/*.parquet",
+            "cache_dir": None,
+        }
+    ]
 
 
 def test_prepare_token_shards_records_counts_per_shard_and_in_total(tmp_path):
@@ -185,7 +203,7 @@ def test_prepare_token_shards_resumes_after_a_crash_without_redoing_finished_sha
     # 000 finished before the crash and is kept; only 001 is tokenized again.
     assert tokenize.texts == ["yo!"]
     np.testing.assert_array_equal(
-        np.fromfile(output_dir / "sample" / "10BT" / "001.bin", dtype=np.uint32),
+        np.fromfile(output_dir / "sample" / "10BT" / "001.bin", dtype="<u4"),
         [121, 111, 33, EOS_ID],
     )
     assert summary == {"num_files": 2, "num_docs": 2, "num_excluded": 1, "num_tokens": 7}

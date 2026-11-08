@@ -139,6 +139,27 @@ Deferred: parallel processing, an error when no file matches (beyond `load_datas
 
 Next: rerun the script to confirm the completed shard is skipped and the same summary is returned. Then commit and open the pull request.
 
+## Review Changes — 2026-11-08
+
+The teammate's review of the pull request raised four points:
+
+1. **Return type annotations.** Accepted. The user added `-> set[str]` to `load_dev_ids` and `-> dict[str, int]` to `prepare_token_shards` and `write_token_shard`. No behavior change, so no test.
+2. **The `.json` skip check is MVP-grade.** Accepted as follow-up work. The `.json` records no source file, revision, tokenizer, or exclusion set, so changing any of them still skips stale shards. A missing or truncated `.bin` is not detected either. Planned: store those inputs in the `.json`, and verify them along with `.bin` size equal to `4 * num_tokens` before skipping.
+3. **`download` is called once per file in addition to the snapshot request.** Accepted. The actual call count is `1 + N`, because `prepare_token_shards` calls `load_dataset` for each file. Agreed fix: extract the per-file parquet reading into a shared helper, so `prepare_token_shards` downloads once and no longer calls `load_dataset`. `load_dataset` behavior is unchanged.
+   - New test: `test_prepare_token_shards_requests_the_snapshot_once_for_all_files` expects exactly one download call with the pattern.
+   - Red (Docker, full suite): `1 failed, 31 passed`. Observed three calls: the pattern, then `sample/10BT/000.parquet` and `sample/10BT/001.parquet`.
+4. **Byte order is implicit.** Accepted. Shards are written and read as explicit little-endian `"<u4"` rather than native `np.uint32`.
+   - Tests in `test_write_token_shard.py` and `test_prepare_token_shards.py` now read shards with `"<u4"`. On little-endian hardware (x86, Apple Silicon), native and explicit little-endian produce identical bytes, so this change cannot fail there and **no Red is claimed**; it records the format contract.
+   - The reader side (`PackedTokenDataset`) is on the task 009 branch.
+
+Green, 2026-11-08:
+
+- The user extracted `read_parquet_rows(path, columns)`. `load_dataset` now delegates to it with `yield from`; `prepare_token_shards` reads each globbed local `path` with it and no longer calls `load_dataset`. `write_token_shard` writes `"<u4"`.
+- Full suite (Docker): `32 passed`.
+- Intermediate Red: calling `read_parquet_rows(...)` without `yield from` left `load_dataset` with no `yield`, so it was no longer a generator and returned `None`. Three `load_dataset` tests failed with `TypeError: 'NoneType' object is not iterable`.
+
+Next: commit and push to update the pull request, reply to the review, then rebase `feat/packed-token-dataset` and switch `PackedTokenDataset` to `"<u4"`.
+
 ## Original Next Action (Done)
 
 Connect real inputs before calling the task complete for real data: add the `tokenizers` dependency (user decision), tokenize with `meta-llama/Llama-3.2-1B` `tokenizer.json` using `add_special_tokens=False`, read `dev-ids.txt` from `cerulean-works/fineweb-edu-dev`, and run one real parquet file through `load_dataset` → `write_token_shard`, checking that decoded tokens match the source text.
