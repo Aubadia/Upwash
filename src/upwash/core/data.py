@@ -55,6 +55,21 @@ def read_parquet_rows(path, columns):
         for row in batch.to_pylist():
             yield row
 
+class PackedTokenDataset:
+    def __init__(self, path, seq_len):
+        self.seq_len = seq_len
+        self.tokens=np.memmap(path, dtype=np.uint32, mode="r")
+
+    def __len__(self):
+        return (len(self.tokens) -1 ) //self.seq_len
+    
+    def __getitem__(self, i):
+        start = i * self.seq_len
+        chunk = self.tokens[start: start+ self.seq_len + 1].astype(np.int64)
+        chunk = torch.from_numpy(chunk)
+        return chunk[:-1], chunk[1:]
+
+
 def load_dataset(repo_id, *, revision, data_files, columns, cache_dir=None
                  , download=snapshot_download):
     local_dir = download(repo_id, repo_type="dataset", revision=revision, allow_patterns=data_files, cache_dir=cache_dir)
