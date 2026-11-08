@@ -1,4 +1,9 @@
 import torch
+from huggingface_hub import snapshot_download
+from pathlib import Path
+import pyarrow.parquet as pq
+
+
 
 class TensorDataset:
     def __init__(self, inputs, targets):
@@ -42,3 +47,16 @@ class DataLoader:
         else:
             return (len(self.dataset) + self.batch_size -1) // self.batch_size
             
+
+def load_dataset(repo_id, *, revision, data_files, columns, cache_dir=None
+                 , download=snapshot_download):
+    local_dir = download(repo_id, repo_type="dataset", revision=revision, allow_patterns=data_files, cache_dir=cache_dir)
+    files = sorted(Path(local_dir).glob(data_files))
+    if not files:
+        raise ValueError(f"no files match {data_files!r} in {local_dir}")
+
+    for path in files:
+        for batch in pq.ParquetFile(path).iter_batches(columns=columns):
+            for row in batch.to_pylist():
+                yield row
+        

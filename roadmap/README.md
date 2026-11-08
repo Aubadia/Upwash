@@ -4,9 +4,11 @@ Last updated: 2026-11-08 (Asia/Taipei).
 
 ## Resume Here
 
-Read [the architecture](../docs/Architecture.md), [the Trainer goal](../docs/Trainer.md), and [the latest task](006-fit-linear-regression.md), then inspect relevant source and tests. Verify this record against the checkout before proceeding.
+Read [the architecture](../docs/Architecture.md), [the Trainer goal](../docs/Trainer.md), and [the latest task](007-load-dataset.md), then inspect relevant source and tests. Verify this record against the checkout before proceeding.
 
 ## Current Position
+
+Current task: [007 — Load parquet datasets from the Hugging Face Hub](007-load-dataset.md), on branch `feat/load-dataset` after PR #1 merged. The user added `huggingface-hub` and `pyarrow`; `uv sync --locked` and the existing suite (`19 passed`) succeeded. Green on 2026-11-08: the user implemented `load_dataset` in `core/data.py`; the full suite returned `23 passed`. Next: a one-off manual check against a real FineWeb-Edu file, and confirming the exact Llama 3 tokenizer repo with the lab. Evaluation sets are scored by `flock eval` and are out of scope.
 
 Latest completed task: [006 — Fit a small linear regression end to end](006-fit-linear-regression.md). A verification scenario, not a new feature: 30 `train(loader)` calls over `y = 3x + 1` reach weight approximately `3` and bias approximately `1`. Passed on first run with no production changes; no Red is claimed. A scratch `lr=0.0` copy failed as expected. Full suite in Docker: `19 passed` on 2026-11-08. Next minimum-viable gap: training loss is not observable from `train()` (Logger area).
 
@@ -42,6 +44,7 @@ The user normally writes production code. The agent supports design, tests, fail
 | [004](004-empty-batches.md) | Reject iterables that yield no batches. | Empty list and iterator raise `ValueError`; full suite `8 passed`. | Green. |
 | [005](005-data-loader.md) | Minimal dataset and loader consumed by `Trainer.train`. | Ordered batches `[2, 2, 1]`, `drop_last`, `len` including divisible cases, repeated iteration, trained weight `0.72`. | Green: full suite `18 passed`. |
 | [006](006-fit-linear-regression.md) | Fit `y = 3x + 1` end to end with the existing framework. | Final loss below `1e-4`; weight and bias within `1e-3` of `3` and `1`. | Verified: `19 passed`; no production change needed. |
+| [007](007-load-dataset.md) | Read selected columns from pinned parquet files on the Hugging Face Hub, reusing the local cache. | Matching files in sorted order, requested columns, `ValueError` when nothing matches, pinned snapshot request. | Green: `23 passed`. |
 
 Custom operation kernels are not needed for this milestone. No Hugging Face differential compatibility requirement has been selected.
 
