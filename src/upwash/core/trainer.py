@@ -3,11 +3,12 @@ import torch
 from upwash.core.state import TrainingState
 
 class Trainer:
-    def __init__(self, model: torch.nn.Module, loss_fn, optimizer):
+    def __init__(self, model: torch.nn.Module, loss_fn, optimizer, logger=None):
         self.state = TrainingState()
         self.model = model
         self.loss_fn = loss_fn
         self.optimizer = optimizer
+        self.logger = logger
 
     def compute_loss(
             self, 
@@ -34,6 +35,8 @@ class Trainer:
             raise ValueError("batches cannot be empty")
         
         self.state.set_state("global_step", steps) 
+        
+        # logger.log() when needed
 
         return self.state
         
