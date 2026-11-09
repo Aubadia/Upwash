@@ -85,4 +85,35 @@ This follows the task 008 review, which made the shard format explicit little-en
 - `main` was merged into this branch. The only conflict was `roadmap/README.md`. It was resolved from `main`'s version, with this task added.
 - Full suite on the merged tree (Docker): `54 passed`.
 
+## Review: Argument and Index Checks — 2026-11-09
+
+Review on PR #3 asked for validation of `seq_len` (line 59) and of the index (line 64). This brings the deferred index bounds checks into this task. Agreed behavior, following Python sequences:
+
+- `seq_len <= 0` raises `ValueError` in the constructor, before the shard is opened.
+- `dataset[-k]` equals `dataset[len - k]` for `1 <= k <= len`.
+- An index `>= len` or `< -len` raises `IndexError`.
+- Plain iteration (`iter(dataset)`, which indexes until `IndexError`) yields exactly `len` samples.
+
+Tests added to `tests/unit/core/test_packed_token_dataset.py`. Iteration is capped with `islice`, so a missing `IndexError` fails the test instead of hanging it.
+
+Verified Red (Docker, `uv run pytest -q tests/unit/core/test_packed_token_dataset.py`): `8 failed, 7 passed`. Full suite: `8 failed, 54 passed`. Causes, all from the missing checks:
+
+- `seq_len` 0 and -1: `DID NOT RAISE ValueError`. The constructor does no arithmetic with `seq_len`.
+- `dataset[-1]` returns empty tensors: `start = -4`, so the slice `[-4:1]` is empty.
+- `dataset[-2]` returns the wrong tokens, `[11, 12, 13, 14]`: the slice `[-8:-3]` counts from the end of the file.
+- `dataset[2]`, `[3]`, `[-3]`: `DID NOT RAISE IndexError`.
+- Iteration over 10 tokens yields 3 samples; the third is `([18], [19])`, built from the leftover token.
+
+Verified Green — 2026-11-09. The user implemented both checks:
+
+- `__init__` raises `ValueError(f"seq_len must be positive, got {seq_len}")`.
+- `__getitem__` adds `len(self)` to a negative index, then raises `IndexError` if the index is still outside `[0, len)`.
+
+Command (Docker): `uv run pytest -q tests/unit/core/test_packed_token_dataset.py` returned `15 passed`. Full suite: `62 passed`.
+
+Refinements suggested to the user; no test covers either:
+
+- The check runs after `np.memmap`, so an invalid `seq_len` still opens the shard. The agreed order is to check first.
+- The `IndexError` message reports the converted index (`-1` for `dataset[-3]`) instead of the caller's value.
+
 Status: complete for single-shard, in-order training data. The deferred items above are next for the data area. A real model, optimizer schedule, and device handling are outside this task.

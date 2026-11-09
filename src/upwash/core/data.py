@@ -58,12 +58,19 @@ def read_parquet_rows(path, columns):
 class PackedTokenDataset:
     def __init__(self, path, seq_len):
         self.seq_len = seq_len
-        self.tokens=np.memmap(path, dtype="<u4", mode="r")
+        self.tokens = np.memmap(path, dtype="<u4", mode="r")
+        if self.seq_len <= 0:
+            raise ValueError(f"seq_len must be positive, got {seq_len}")
 
     def __len__(self):
         return (len(self.tokens) -1 ) //self.seq_len
     
     def __getitem__(self, i):
+        n = len(self)
+        if i < 0:
+            i += n
+        if i < 0 or i >= n:
+            raise IndexError(f"index {i} out of range for {n} samples")
         start = i * self.seq_len
         chunk = self.tokens[start: start+ self.seq_len + 1].astype(np.int64)
         chunk = torch.from_numpy(chunk)
