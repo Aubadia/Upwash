@@ -79,4 +79,10 @@ This follows the task 008 review, which made the shard format explicit little-en
 - Full suite (Docker): `40 passed`.
 - No Red is claimed: on little-endian hardware, native `uint32` and `"<u4"` are identical.
 
+## Merge with `main` — 2026-11-09
+
+- PR #4 (configuration, MemoryLogger, Builder; tasks 010–012) merged into `main`. It renumbered its tasks to 010–014, which leaves 009 for this task.
+- `main` was merged into this branch. The only conflict was `roadmap/README.md`. It was resolved from `main`'s version, with this task added.
+- Full suite on the merged tree (Docker): `54 passed`.
+
 Status: complete for single-shard, in-order training data. The deferred items above are next for the data area. A real model, optimizer schedule, and device handling are outside this task.
