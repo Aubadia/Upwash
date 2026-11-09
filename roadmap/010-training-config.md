@@ -1,8 +1,8 @@
-# 009 — Minimal Training Configuration
+# 010 — Minimal Training Configuration
 
 ## Status
 
-Complete for the tested Python-float scope: composed configuration, negative rejection, zero acceptance, and non-finite rejection verified Green on 2026-11-08. Broader accepted numeric types remain deferred. New roadmap work starts at 009; 001–006 retain their historical numbers, and 007–008 are unused.
+Complete for the tested Python-float scope: composed configuration, negative rejection, zero acceptance, and non-finite rejection verified Green on 2026-11-08. Broader accepted numeric types remain deferred. This configuration task is now numbered 010; tasks 001–008 retain their numbers, and 009 is open.
 
 ## Goal and Agreed Initial API
 
@@ -74,4 +74,4 @@ No Hugging Face component is being replaced in this task, so no compatibility or
 - Verified scope: composed access to `lr=0.1`, rejection of `-0.1`, acceptance of `0.0`, and rejection of NaN and both infinities. Broader numeric and nonnumeric input types remain deferred; no universal input-type validation guarantee is claimed.
 - No agent production edits, dependency changes, or test configuration changes were made.
 
-Next action: agree on the minimal Logger API in [010](010-metric-logger.md) before writing its first Red test.
+Next action: agree on the minimal Logger API in [011](011-metric-logger.md) before writing its first Red test.

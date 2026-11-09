@@ -1,8 +1,8 @@
-# 011 — Build a Configured Trainer
+# 012 — Build a Configured Trainer
 
 ## Status
 
-Current task after [009](009-training-config.md) and [010](010-metric-logger.md). On 2026-11-09 the user agreed on the construction interface below, including optional logger injection and storage in Trainer. Automatic training-loss logging remains removed. Complete: construction, optional logger, real optimizer wiring, and caller-owned logging behavior verified Green. No agent production edits.
+Current task after [010](010-training-config.md) and [011](011-metric-logger.md). On 2026-11-09 the user agreed on the construction interface below, including optional logger injection and storage in Trainer. Automatic training-loss logging remains removed. Complete: construction, optional logger, real optimizer wiring, and caller-owned logging behavior verified Green. No agent production edits.
 
 ## Goal and Agreed Interface
 
@@ -56,7 +56,7 @@ Next action: user implements `build_trainer` and optional Trainer logger storage
 - Cause: `logger: None` is a type annotation, not a default. Trainer and build_trainer both currently require the argument, contrary to the agreed optional `logger=None` API. The existing regression tests correctly omit it and should not be changed to hide this regression.
 - The initial Builder test always supplies a logger, so it does not cover omission. Real update wiring, a second learning rate, omitted Builder logger, and no automatic training metrics remain later tests.
 
-Current next action: user gives logger a default of None in both constructors/functions, then agent reruns relevant tests and full regressions. No agent production edits, dependency changes, or test configuration changes were made. Task 011 is not complete.
+Current next action: user gives logger a default of None in both constructors/functions, then agent reruns relevant tests and full regressions. No agent production edits, dependency changes, or test configuration changes were made. Task 012 is not complete.
 
 ## Trainer Default Green and Builder Default Red — 2026-11-09
 
@@ -76,4 +76,4 @@ Current next action: user adds the agreed `logger=None` default to build_trainer
 - New integration cases passed on their first run; no Red is claimed for already-implemented behavior. They verify configured learning rates reach the correct model parameters and that training does not automatically emit metrics.
 - No agent production edits, dependency changes, or test configuration changes were made.
 
-This Green supersedes earlier handoffs. Next action: agree on task 012's wandb adapter interface, exact SDK version, and dependency/test setup before its first Red. No remote SDK compatibility or hosted delivery is established by Builder tests.
+This Green supersedes earlier handoffs. Next action: agree on task 013's wandb adapter interface, exact SDK version, and dependency/test setup before its first Red. No remote SDK compatibility or hosted delivery is established by Builder tests.

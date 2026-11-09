@@ -1,8 +1,8 @@
-# 010 — Shared Metric Logging and MemoryLogger
+# 011 — Shared Metric Logging and MemoryLogger
 
 ## Status
 
-Current task. The user agreed on batch metric logging on 2026-11-09: prepare a metrics mapping, then call `logger.log(metrics, step=step)`. All four MemoryLogger behaviors are verified Green; the full suite passes. Depends on the completed configuration work in [009](009-training-config.md). Trainer integration and remote-backend proposals remain separate agreements.
+Current task. The user agreed on batch metric logging on 2026-11-09: prepare a metrics mapping, then call `logger.log(metrics, step=step)`. All four MemoryLogger behaviors are verified Green; the full suite passes. Depends on the completed configuration work in [010](010-training-config.md). Trainer integration and remote-backend proposals remain separate agreements.
 
 ## Goal and Agreed Initial Interface
 
@@ -30,11 +30,11 @@ Only MemoryLogger exposes `records`. Preserve insertion order, keep records inde
 2. Write one unit test for multiple metrics in one event and step; confirm the missing API Red without production stubs.
 3. User implements the behavior; verify Green.
 4. Add successive records, instance independence, and input-mapping isolation in small Red/Green steps.
-5. Run relevant regressions and record actual results before moving to [011](011-build-trainer.md).
+5. Run relevant regressions and record actual results before moving to [012](012-build-trainer.md).
 
 ## Boundaries and Next Action
 
-Callers use the shared interaction without depending on MemoryLogger storage. Task 011 adds optional logger injection and storage in Trainer; actual metric emission stays with the user's training logic. [012](012-wandb-logger.md) adds one wandb adapter usable for W&B or Flock; [013](013-flock-logger.md) verifies the Flock destination. Remote runs are caller-owned.
+Callers use the shared interaction without depending on MemoryLogger storage. Task 012 adds optional logger injection and storage in Trainer; actual metric emission stays with the user's training logic. [013](013-wandb-logger.md) adds one wandb adapter usable for W&B or Flock; [014](014-flock-logger.md) verifies the Flock destination. Remote runs are caller-owned.
 
 CompositeLogger and simultaneous destinations are deferred until explicitly required. They need delivery/error semantics and SDK verification for runs targeting different hosts. File and console backends are also deferred.
 
@@ -62,4 +62,4 @@ The user now snapshots incoming metrics with `copy.deepcopy`. `./test.sh` return
 
 For scalar-only values, a shallow mapping copy would suffice; simplifying the deep copy is an optional user refactor. Strict keyword-only step enforcement is not tested. `core/contracts.py` remains empty: shared typing is not implemented or verified, and can be introduced when the next interchangeable logger interaction needs it.
 
-This Green supersedes the preceding mapping-isolation handoff. Next action: proceed directly to task 011 Builder. Its interface is now agreed, including optional logger injection and storage in Trainer. On 2026-11-09 the user removed the automatic training-loss logging task; automatic loss logging and callbacks are not part of the route.
+This Green supersedes the preceding mapping-isolation handoff. Next action: proceed directly to task 012 Builder. Its interface is now agreed, including optional logger injection and storage in Trainer. On 2026-11-09 the user removed the automatic training-loss logging task; automatic loss logging and callbacks are not part of the route.

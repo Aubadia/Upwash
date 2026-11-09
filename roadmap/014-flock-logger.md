@@ -1,12 +1,12 @@
-# 013 — Verify the Flock Logging Destination
+# 014 — Verify the Flock Logging Destination
 
 ## Status
 
-Planned after [012](012-wandb-logger.md). Official source documentation confirms the wandb SDK path; executable server compatibility and delivery remain unverified. No separate FlockLogger is planned. Exact SDK/server versions and an integration environment await agreement.
+Planned after [013](013-wandb-logger.md). Official source documentation confirms the wandb SDK path; executable server compatibility and delivery remain unverified. No separate FlockLogger is planned. Exact SDK/server versions and an integration environment await agreement.
 
 ## Goal
 
-Verify task 012's WandbLogger with a run targeting Flock. The caller configures and owns the run; the caller chooses metrics and steps, while Builder only passes the logger through and Trainer stores it without automatic metric emission. Reuse adapter unit tests rather than duplicating an adapter for a second host.
+Verify task 013's WandbLogger with a run targeting Flock. The caller configures and owns the run; the caller chooses metrics and steps, while Builder only passes the logger through and Trainer stores it without automatic metric emission. Reuse adapter unit tests rather than duplicating an adapter for a second host.
 
 The Flock guide documents process-specific `WANDB_BASE_URL=https://flock-api.cerulean.works` and `WANDB_API_KEY`. Its CLI token is distinct from the wandb key. Configuration examples are not instructions to modify this machine's credentials or SDK defaults.
 
@@ -30,6 +30,6 @@ These guides were retrieved from main; the repository API reported HEAD `9055b0d
 3. Finalize the caller-owned run, then inspect persisted values, steps, and completed status through Flock's documented query API; do not use unsupported `wandb.Api()`.
 4. Report SDK/server versions, command, destination type, observed values, and cleanup ownership. Distinguish delivery failures from adapter defects or environment blockers.
 
-Task 012's offline result cannot establish Flock delivery. Simultaneous W&B/Flock runs in one process need separate SDK validation if later requested. No service has been started, credential changed, or metric uploaded as part of planning.
+Task 013's offline result cannot establish Flock delivery. Simultaneous W&B/Flock runs in one process need separate SDK validation if later requested. No service has been started, credential changed, or metric uploaded as part of planning.
 
-Next action after 012: agree on and prepare the integration environment before attempting delivery verification.
+Next action after 013: agree on and prepare the integration environment before attempting delivery verification.
