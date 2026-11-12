@@ -15,6 +15,7 @@ dependencies = [
     "tokenizer>=3.7.0",
     "tokenizers>=0.23.3",
     "torch>=2.15.0",
+    "wandb>=0.31.0",
 ]
 
 [project.scripts]

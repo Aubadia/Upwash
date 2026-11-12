@@ -1,5 +1,9 @@
 # 009 — Read a Token Shard as Packed Training Samples
 
+## Current Handoff — 2026-11-12
+
+PR #3 is merged into `main` at `7e60792`. The two refinements recorded below remain in the current source: validation still follows memmap creation, and an invalid negative index is reported after conversion. No new tests were added. `./test.sh` failed during collection with eight errors because local `.venv` lacks `huggingface_hub` and `pyarrow`; the earlier Docker `62 passed` remains historical evidence. Task 013 is the next main-route task.
+
 ## Behavior
 
 Connect the token shards from task 008 to the existing `DataLoader` and `Trainer`. Read a `.bin` shard without loading it into memory and split its token stream into fixed-length samples. Each sample pairs `seq_len` input tokens with the next-token labels. This runs at training time, once per sample; task 008 runs once, ahead of training.

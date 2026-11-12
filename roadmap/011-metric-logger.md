@@ -34,7 +34,7 @@ Only MemoryLogger exposes `records`. Preserve insertion order, keep records inde
 
 ## Boundaries and Next Action
 
-Callers use the shared interaction without depending on MemoryLogger storage. Task 012 adds optional logger injection and storage in Trainer; actual metric emission stays with the user's training logic. [013](013-wandb-logger.md) adds one wandb adapter usable for W&B or Flock; [014](014-flock-logger.md) verifies the Flock destination. Remote runs are caller-owned.
+Callers use the shared interaction without depending on MemoryLogger storage. Task 012 adds optional logger injection and storage in Trainer; actual metric emission stays with the user's training logic. Following the user's 2026-11-12 scope change and merge of tasks 013–014, [013](013-flock-logger.md) covers both FlockLogger through the selected wandb SDK transport and actual Flock delivery verification. W&B service support is outside scope. FlockLogger now initializes its run from caller-supplied project/name/config; completion behavior remains to be agreed in task 013.
 
 CompositeLogger and simultaneous destinations are deferred until explicitly required. They need delivery/error semantics and SDK verification for runs targeting different hosts. File and console backends are also deferred.
 
