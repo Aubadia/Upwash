@@ -32,7 +32,10 @@ Upwash/
 │       └── core/
 │           ├── contracts.py
 │           ├── data.py
-│           ├── logger.py
+│           ├── logger/
+│           │   ├── __init__.py
+│           │   ├── memory.py
+│           │   └── flock.py
 │           ├── state.py
 │           └── trainer.py
 └── tests/
@@ -54,6 +57,8 @@ Production modules live under `src/upwash/`. Module paths below are relative to 
 - `components/schedulers`: Learning rate adjustments based on progress or evaluation results.
 - `config.py`: Settings for a training run, organized through composition. Add component-specific configuration as needed.
 - `builder.py`: Component construction and wiring.
+
+Logging implementations belong in `core/logger/`, converted from `core/logger.py` at the user's request. `memory.py` contains the existing MemoryLogger, re-exported by `__init__.py` to preserve `from upwash.core.logger import MemoryLogger`. The user has renamed the remote module to `flock.py` and agreed on `from upwash.core.logger import FlockLogger`. The user has implemented its constructor in `flock.py`; the package re-export and metric forwarding remain incomplete in the inspected source. [Task 013](../roadmap/013-flock-logger.md) now covers both the adapter and actual Flock delivery, merging the former tasks 013 and 014. The [official logging reference](https://docs.cerulean.works/flock/main/reference/app/logging-behavior/) confirms that training code uses the wandb SDK against Flock's implementation of the protocol; W&B service support is outside scope. The agreed constructor is `FlockLogger(project, name, config=None)` and creates an SDK run from those experiment settings; `log(metrics, *, step)` forwards metric events. The caller configures the host and credentials. Completion behavior still needs agreement before delivery testing. Trainer and Builder remain independent of the concrete logger, and ordinary core/MemoryLogger imports must not require loading the remote SDK.
 
 Core uses shared contracts where tested interactions require them, keeping it independent of concrete component implementations. The builder constructs and connects runtime objects as needed. Operation kernels belong at the operation layer used by models or loss functions; the minimal Trainer does not require a generic operation-kernel argument. Kernel selection and replacement mechanisms remain to be designed when a concrete operation requirement arises. Initially, contracts shared between core and components live in `core/contracts.py`. Add shared implementations within each component family as needed.
 

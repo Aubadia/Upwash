@@ -4,21 +4,88 @@ Last updated: 2026-11-12 (Asia/Taipei).
 
 ## Resume Here
 
-Read [Architecture.md](../docs/Architecture.md), [Trainer.md](../docs/Trainer.md), and [013 — Shared wandb SDK adapter](013-wandb-logger.md), then inspect the relevant source and tests. The initial MemoryLogger batch interface is agreed; the task 012 Builder interface with optional logger injection is also agreed; remote adapter proposals still need agreement before tests. The user writes production code; the agent supports design, tests, failure analysis, and documentation under [AGENTS.md](../AGENTS.md).
+Read [Architecture.md](../docs/Architecture.md), [Trainer.md](../docs/Trainer.md), and [013 — Flock Logger and Delivery Verification](013-flock-logger.md), then inspect the relevant source and tests. Former tasks 013 and 014 are merged into task 013. The agreed public class is `upwash.core.logger.FlockLogger`, implemented by the user in `core/logger/flock.py` and re-exported by `core/logger/__init__.py`. The test is `tests/unit/core/test_flock_logger.py`. The user writes production behavior; the agent supports design, tests, failure analysis, and documentation under [AGENTS.md](../AGENTS.md).
 
 ## Current Position
 
-As of 2026-11-09, PRs #1–#4 are merged. `main` is at `7e60792`, and the full suite on it returns `62 passed` (Docker). Completed: tasks 001–012. Not started: 013 and 014 (remote logging) and the training gaps listed under [Gaps Toward the Lab Run](#gaps-toward-the-lab-run).
+As of 2026-11-12, PRs #1–#5 are merged. `main` is at `1fca7a3` (PR #5, FlockLogger).
 
-Data area, current task: [015 — Read many shards as one dataset, with a sample budget](015-multi-shard-dataset.md), on branch `feat/multi-shard-dataset`. Agreed interface: `ConcatDataset(datasets)` and `Truncate(dataset, num_samples)`. Red verified on 2026-11-12: `ImportError` for both names. The user implemented both classes, and Green was reached the same day: `21 passed` for the task, full suite `83 passed`. A read-only check on the real shard gives the expected lengths and `(8, 4096)` batches. Committed as `41f8bca`, not yet pushed.
+Configuration (010), MemoryLogger (011), Builder (012), and the three FlockLogger unit cases are now verified Green. The user added deep-copying before SDK forwarding; all 65 tests pass. Task 013 remains incomplete because actual Flock delivery has not been exercised: current tests substitute RecordingRun for the SDK run.
 
-Next data task, in the same pull request: [016 — Read Flock's pre-tokenized `.npy` shards](016-npy-token-shard.md). Agreed interface: `PackedTokenDataset.from_npy(path, seq_len)`. Red verified on 2026-11-12: six new cases failed with `AttributeError` (no `from_npy`). The user implemented it, and Green was reached the same day: `21 passed` in the file, full suite `89 passed`. A read-only check on a real Flock `tokens.npy` confirms memory-mapping, `len` 15,395, and `(8, 4096)` batches. Still open: verifying the Flock data's dev-set exclusion. Next: commit, push, and open the pull request for 015 and 016, then seeded shuffle.
+The accepted constructor is `FlockLogger(project, name, config=None)` and initializes the SDK run from those settings; `log(metrics, *, step)` forwards events. The caller supplies experiment settings and owns logging policy, Flock host configuration, and authentication. The user implemented finish() and an atexit fallback; repeated-finish and post-finish behavior remain untested. Builder passes through the optional logger and Trainer stores it without automatic metric emission. The official Flock guide confirms use of the wandb SDK; W&B service support is outside scope. No SDK serialization or Flock delivery has been verified. Only finishing the unit test does not complete task 013.
 
-Configuration (010), MemoryLogger (011), and Builder (012) are implemented and verified Green. Current task is [013 — Shared wandb SDK adapter](013-wandb-logger.md): agree on adapter API, exact SDK version, and dependency/test setup before the first test. The same adapter is planned for W&B or Flock; SDK compatibility and actual server delivery remain unverified.
+```python
+logger = FlockLogger(project="lab6-predictable-scaling", name="tiny-training", config={"lr": 0.1})
+```
 
-Builder constructs the configured optimizer for the supplied model and passes through an optional logger. Trainer stores `trainer.logger`; metric selection, timing, and actual logging remain with the user's training logic. Two real SGD integration cases verify different learning rates update the supplied model and training emits no automatic metrics. `core/contracts.py` remains empty; introduce shared typing when a tested interaction needs it. Tasks 013–014 have no tests or implementation. The agent changed only tests and documentation during this step.
+The earlier `FlockLogger(run=run)` constructor is superseded. Unit tests replace `wandb.init` with a RecordingRun factory; they do not initialize a real SDK run.
 
-## Current Verification — 2026-11-09
+The required Flock scenario logs these seven metrics: `train/loss`, `train/grad_norm`, `train/learning_rate`, `train/tokens_per_second`, `train/total_tokens_seen`, `eval/loss`, and `eval/perplexity`. Their definitions and known-value payload are recorded in [013](013-flock-logger.md). Unit tests verify forwarding of supplied values; their numerical calculation remains with training/evaluation code. No automatic Trainer metric emission or logger key filtering is added. Parameter-group LR naming remains to be agreed for a future multi-group case.
+
+Data area, current task: [015 — Read many shards as one dataset, with a sample budget](015-multi-shard-dataset.md), on branch `feat/multi-shard-dataset`. Agreed interface: `ConcatDataset(datasets)` and `Truncate(dataset, num_samples)`. Red verified on 2026-11-12: `ImportError` for both names. The user implemented both classes, and Green was reached the same day: `21 passed` for the task, full suite `83 passed`. A read-only check on the real shard gives the expected lengths and `(8, 4096)` batches. Committed as `41f8bca`.
+
+Next data task, in the same pull request: [016 — Read Flock's pre-tokenized `.npy` shards](016-npy-token-shard.md). Agreed interface: `PackedTokenDataset.from_npy(path, seq_len)`. Red verified on 2026-11-12: six new cases failed with `AttributeError` (no `from_npy`). The user implemented it, and Green was reached the same day: `21 passed` in the file, full suite `89 passed`. A read-only check on a real Flock `tokens.npy` confirms memory-mapping, `len` 15,395, and `(8, 4096)` batches. Still open: verifying the Flock data's dev-set exclusion. Committed as `65f0833`. Both commits are pushed on `feat/multi-shard-dataset`, and `main` (with PR #5) was merged into the branch on 2026-11-12; the only conflict was this README. Next: open the pull request for 015 and 016, then seeded shuffle.
+
+## Current Verification — 2026-11-12
+
+Latest after the user's mapping-copy implementation: `./test.sh` → exit 0; `65 passed in 1.95s`. Constructor, seven-metric forwarding (values/step/commit/input isolation), and exit-callback regression are Green. This supersedes the earlier Red records below. All Flock tests patch wandb.init and use RecordingRun; no real SDK run or upload occurs, even with project lab6-predictable-scaling. Source search found no separate real Flock logging scenario under src/scripts/tests. The requested dashboard URL could not be inspected with the web tool, so no claim is made about existing server runs. Next: prepare actual Flock delivery verification with the selected organization/project, host/key setup, a distinct run name, and explicit completion; obtain authorization for the concrete hosted upload before execution. No credentials were read or changed and no network logging occurred.
+
+Latest after explicit commit forwarding: `./test.sh tests/unit/core/test_flock_logger.py` → exit 1; `1 failed, 2 passed in 0.23s`. The metric-event test now verifies all seven metric values, step 7, commit=True, and unchanged caller input immediately after log. Its final assertion fails: clearing the caller's metrics also clears RecordingRun's received mapping (`{}` instead of seven values). This confirms the intended mapping-isolation Red. Next: user forwards a separate dict to the SDK, preserving the current step/commit behavior. The full suite was not rerun. Earlier commit/export failures below are historical. The user also added an optional commit argument; commit=False behavior has not been agreed or tested.
+
+Latest after the user's package export: `./test.sh tests/unit/core/test_flock_logger.py` → exit 1; `1 failed, 2 passed in 0.25s`. Constructor and exit callback pass. Metric forwarding now reaches `flock.py:20` and raises `TypeError: RecordingRun.log() missing 1 required keyword-only argument: 'commit'` because production calls `run.log(metrics, step=step)`. This is the intended forwarding Red for the agreed explicit commit behavior. Input-isolation assertions have not executed; the source still passes the caller's mapping directly. Next: user forwards an independent mapping and `commit=True`, then rerun the targeted tests. The full suite was not rerun for this check. Earlier missing-export outcomes below are historical.
+
+Latest cleanup verification: `./test.sh tests/unit/core/test_flock_logger.py` → `1 failed, 2 passed in 0.24s`; `./test.sh` → `1 failed, 64 passed in 1.80s` (both exit 1). The sole failure is the missing FlockLogger package export. Constructor and captured exit-callback cases pass; no ignored atexit exception appeared. The error was a missing finish() method on the RecordingRun test double, reproduced Red and then fixed in test support. Tests intercept atexit registration to prevent process-exit callbacks leaking across cases. Production code was unchanged; see [013](013-flock-logger.md) for commands and the regression cause.
+
+The earlier table below predates the cleanup regression:
+
+| Command | Result | Interpretation |
+| --- | --- | --- |
+| `./test.sh tests/unit/core/test_flock_logger.py tests/unit/core/test_logger.py` | Exit 1; `1 failed, 5 passed in 0.28s`. | Required-project constructor and four MemoryLogger cases pass. Metric test is Red for the missing package export; seven-key payload assertions have not executed. |
+| `./test.sh tests/unit/core/test_flock_logger.py` (earlier snapshot) | Exit 1; `2 failed in 0.02s`. | Historical syntax blocker, now resolved. |
+| `./test.sh` (earlier project/payload) | Exit 1; `1 failed, 63 passed in 2.04s`. | Earlier regression evidence only; full suite not rerun after updating the fixture. |
+
+Tests now use project `lab6-predictable-scaling` and the exact seven metric names from the user's requirements. Both logger cases patch SDK initialization and create no real run. The agent changed only tests and documentation; dependencies, source, credentials, and SDK settings were not changed.
+
+Next: user exports FlockLogger through `core/logger/__init__.py` and completes metric forwarding, then rerun the targeted tests. Use explicit finish() when verifying delivery with the same project and metrics; its broader lifecycle semantics still need tests. Default/empty-config behavior, metric computation, real SDK serialization, and actual Flock delivery remain unverified. SDK is 0.31.0; the server/environment and exact deployed version remain to be selected.
+
+## Route 011–013
+
+| Task | Deliverable | Dependencies | Next action |
+| --- | --- | --- | --- |
+| [011](011-metric-logger.md) | Shared logging interaction and MemoryLogger. | 010 complete. | Complete for its four tested memory behaviors. |
+| [012](012-build-trainer.md) | Build configured optimizer and Trainer with optional logger storage. | 010 complete. | Complete; existing Builder tests remain Green. |
+| [013](013-flock-logger.md) | FlockLogger(project, name, config=None) and actual Flock delivery. | 011; scheduled after 012. | Constructor and exit callback Green; All unit cases Green; next verify actual Flock delivery. |
+
+Former task 014 is merged into 013 and is no longer a separate milestone. Earlier tasks keep their numbers.
+
+## Shared Design
+
+- FlockLogger initializes its SDK run from `project`, `name`, and optional `config`, then exposes `log(metrics, *, step)` and forwards an independent metric mapping with the supplied step and `commit=True`. Only MemoryLogger exposes `records`.
+- The caller supplies experiment settings and detached scalar metrics, and chooses logging frequency and valid increasing SDK steps. FlockLogger initializes the run; the user has implemented finish() with an atexit fallback; only the single callback path is tested. Returned `state.global_step` remains per-call; no cumulative Trainer logging counter is planned.
+- Builder passes an optional logger unchanged to Trainer. Ordinary core/MemoryLogger imports must not require loading the remote SDK.
+- A fresh Flock run created through the logger is the first delivery scenario. Resume, shared runs, CompositeLogger, multi-host delivery, and retry policies remain deferred.
+
+Official guide links, SDK/documentation versions, historical adapter results, and delivery acceptance steps live in [013](013-flock-logger.md). Only an actual server check establishes delivery; offline SDK serialization does not.
+
+## Historical Verification — Earlier on 2026-11-12
+
+These entries predate the FlockLogger rename and merged task. Their old names, paths, and next-action notes are historical; the current verification above supersedes them.
+
+
+- Latest full suite: `./test.sh` → exit 1; `1 failed, 62 passed in 2.28s`. Sole intended Red: `ImportError` for the missing `WandbLogger` in `upwash.core.logger`; metric assertions have not executed. All existing tests, including the data suite, pass. Earlier environment-blocker results below are historical.
+- Local packages now include wandb 0.31.0, huggingface_hub 2.4.0, pyarrow 26.0.1, and pytest 9.2.0. The user's `pyproject.toml` declares `wandb>=0.31.0`; the agent made no dependency, lockfile, installation, or test-configuration changes. The user has since renamed the source to `flock.py`; it imports wandb but contains no logger class.
+- Documentation read: the user-supplied hosted guide and its logging/compatibility references were successfully retrieved (HTTP 200), resolving the previous document-access blocker. The documented SDK transport is confirmed; deployed compatibility remains unverified. The pages identify documentation revision `710e75a857969be3fefef67c50b3df016f15ef15`. No tests were rerun and no source/test changes were made for this documentation-only update.
+- Current branch is `main`, with PR #3 merged at `7e60792`. The worktree was clean before this session's documentation updates.
+- `./test.sh tests/unit/test_training_config.py tests/unit/core/test_logger.py tests/unit/test_builder.py tests/integration/test_built_trainer.py` → exit 0; `14 passed in 2.95s`. Tasks 010–012 remain Green for their tested scope.
+- `./test.sh` → exit 2; eight collection errors because the local `.venv` lacks `huggingface_hub` and `pyarrow`. This is an environment blocker, not an intended Red or a verified full-suite regression. No dependencies or test configuration were changed.
+- Historical first Red at the superseded `integrations/` path: `./test.sh tests/unit/integrations/test_wandb_logger.py` → exit 1; `1 failed in 0.01s` for missing `upwash.integrations`. The user subsequently agreed to place WandbLogger in `core/logger.py`, and the test moved to `tests/unit/core/test_wandb_logger.py`. It expects one complete metric event with step 7, `commit=True`, and input isolation.
+- Rechecked the same 010–012 command above after adding the test → exit 0; `14 passed in 1.29s`.
+- After agreeing on `core/logger.py`: `./test.sh tests/unit/core/test_wandb_logger.py tests/unit/core/test_logger.py tests/unit/test_training_config.py tests/unit/test_builder.py tests/integration/test_built_trainer.py` → exit 1; `1 failed, 14 passed in 1.45s`. Intended Red: cannot import the missing `WandbLogger` class from the existing `upwash.core.logger` module. Behavioral assertions have not executed; existing regression cases remain Green.
+- After the user-requested conversion to `core/logger/`, the same command → exit 1; `1 failed, 14 passed in 1.31s`. MemoryLogger's public import and existing behavior remain Green, and its moved source is byte-for-byte unchanged. WandbLogger remains Red for its missing class/export in the package. No SDK or dependency changes were made.
+- Next: user implements and exports the run adapter in `flock.py`, then verify Green and select the Flock server/environment for 014. The last agreed public class is WandbLogger; align any rename before editing tests. An offline SDK check is an optional diagnostic, not a separate W&B milestone. Official documentation confirms the selected transport; actual delivery still requires execution against Flock.
+
+## Historical Verification — 2026-11-09
+
 
 | Command | Result | Interpretation |
 | --- | --- | --- |
@@ -27,28 +94,6 @@ Builder constructs the configured optimizer for the supplied model and passes th
 | `./test.sh` | Exit 0; `46 passed in 2.11s`. | Current combined suite Green. |
 
 Earlier environment and optional-logger failures are resolved. The two new integration cases passed on their first run; no Red is claimed for already-supported behavior. Detailed historical results remain in task files. The agent changed no dependencies or test configuration.
-
-## Route 011–014
-
-| Task | Deliverable | Dependencies | Next action |
-| --- | --- | --- | --- |
-| [011](011-metric-logger.md) | Shared logging interaction and MemoryLogger. | 010 complete. | Complete for four tested memory behaviors; full suite `42 passed`. |
-| [012](012-build-trainer.md) | Build an optimizer from Config and wire Trainer. | 010 complete. | Complete; four Builder cases pass, full suite `46 passed`. |
-| [013](013-wandb-logger.md) | One wandb SDK adapter for W&B or Flock. | 011; scheduled after 012. | Current: agree adapter API, exact SDK version, and optional dependency setup. |
-| [014](014-flock-logger.md) | Verify actual delivery to Flock through that adapter. | 013. | Select pinned SDK/server versions and an agreed integration environment. |
-
-Each task uses small Red/Green steps. Builder constructs the optimizer and Trainer and passes through an optional logger; metric emission stays with the caller. No Hugging Face class replacement or differential compatibility scope is selected for this route.
-
-## Shared Design Proposals
-
-The initial batch logging interface and memory record representation are agreed. The caller owns logging policy; remote adapter details remain proposals:
-
-- All backends support `log(metrics, *, step)`; only MemoryLogger exposes `records`.
-- The calling training logic supplies detached scalar metrics, chooses logging frequency, and manages steps suitable for the destination. Returned `state.global_step` remains per-call; no automatic cumulative Trainer logging counter is planned.
-- Caller owns remote run initialization, host/authentication settings, and completion. Builder accepts optional `logger=None` and injects it unchanged into Trainer, which stores `trainer.logger`; neither initializes or finalizes remote runs, and core imports no concrete remote SDK.
-- One caller-owned fresh run is the first remote scenario. Resume, shared runs, CompositeLogger, simultaneous multi-host delivery, and failure/retry policies require later requirements and agreement.
-
-Offline SDK tests establish serialization; only a real server check establishes delivery. Flock evidence and source links live in [014](014-flock-logger.md), SDK adapter evidence in [013](013-wandb-logger.md). Exact versions must be recorded before executable compatibility checks.
 
 ## Data Pipeline Handoff
 
@@ -65,11 +110,11 @@ The lab target is a 1B Llama-3.2-style model trained on 200B FineWeb-Edu tokens 
 - Data: a seeded shuffle (reading many shards and a token budget are done in task 015), a resume position, per-rank sharding, and tokenizing about 200B tokens. One file took about 31 minutes for 0.73B tokens, so a single process needs on the order of 140 hours. Task 016 instead reads Flock's pre-tokenized `.npy` shards, synced to local disk.
 - Model: no Llama implementation yet (RMSNorm, RoPE, grouped-query attention, SwiGLU, tied embeddings), and no decision between writing one and depending on one.
 - Training loop: no per-step loss output, learning-rate schedule (warmup and decay), gradient clipping, gradient accumulation, weight-decay parameter groups, bf16 mixed precision, device placement, checkpoint save and resume, multi-GPU training, or validation loss.
-- Logging: the wandb adapter (013) and Flock delivery (014). Both depend on `train()` exposing a per-step loss.
+- Logging: FlockLogger unit cases are Green (013, PR #5); actual delivery to Flock is unverified. Useful metrics depend on `train()` exposing a per-step loss.
 - Evaluation hand-off: the checkpoint format Flock evaluation expects has not been confirmed.
 - Optional: μP (per-group learning rates, output multiplier, coordinate check). It covers width only, and the lab has not said whether it is required.
 
-Tasks 001–008 keep their numbers. The configuration and logging tasks moved to 010–014, and 009 is the packed-token dataset.
+Tasks 001–008 keep their numbers, and 009 is the packed-token dataset. Configuration and logging originally used 010–014; former task 014 is now merged into 013.
 
 ## Completed Route
 
