@@ -99,3 +99,82 @@ def test_packed_token_dataset_iteration_stops_after_the_last_sample(tmp_path):
 
     assert len(samples) == 2
     assert samples[-1][1].tolist() == [15, 16, 17, 18]
+
+
+# --- Task 016: shards stored as .npy (Flock pre-tokenized format) ---------------------
+
+
+def write_npy_tokens(path, tokens):
+    """Writes tokens as Flock's tokens.npy stores them: an int32 array with a .npy header."""
+    np.save(path, np.asarray(tokens, dtype=np.int32))
+    return path
+
+
+def test_from_npy_reads_the_same_samples_as_the_bin_format(tmp_path):
+    tokens = list(range(10, 24))  # 14 tokens, seq_len 4 -> 3 samples, one leftover
+    bin_dataset = PackedTokenDataset(write_tokens(tmp_path / "shard.bin", tokens), seq_len=4)
+
+    npy_dataset = PackedTokenDataset.from_npy(write_npy_tokens(tmp_path / "tokens.npy", tokens), seq_len=4)
+
+    # The .npy header must not be read as tokens: same length, same samples.
+    assert isinstance(npy_dataset, PackedTokenDataset)
+    assert len(npy_dataset) == len(bin_dataset) == 3
+    for i in range(3):
+        x, y = npy_dataset[i]
+        expected_x, expected_y = bin_dataset[i]
+        assert x.tolist() == expected_x.tolist()
+        assert y.tolist() == expected_y.tolist()
+
+
+def test_from_npy_returns_int64_tensors_and_keeps_large_token_ids(tmp_path):
+    # Flock documents are [BOS, text, EOS]: 128000 and 128001 are kept as stored.
+    path = write_npy_tokens(tmp_path / "tokens.npy", [128000, 7, 128001, 128000, 9])
+
+    x, y = PackedTokenDataset.from_npy(path, seq_len=4)[0]
+
+    assert x.dtype == torch.int64
+    assert y.dtype == torch.int64
+    assert x.tolist() == [128000, 7, 128001, 128000]
+    assert y.tolist() == [7, 128001, 128000, 9]
+
+
+@pytest.mark.parametrize("seq_len", [0, -1])
+def test_from_npy_rejects_a_non_positive_seq_len(tmp_path, seq_len):
+    path = write_npy_tokens(tmp_path / "tokens.npy", range(9))
+
+    with pytest.raises(ValueError):
+        PackedTokenDataset.from_npy(path, seq_len=seq_len)
+
+
+def test_from_npy_supports_negative_indices_and_raises_index_error_out_of_range(tmp_path):
+    path = write_npy_tokens(tmp_path / "tokens.npy", [10, 11, 12, 13, 14, 15, 16, 17, 18])
+    dataset = PackedTokenDataset.from_npy(path, seq_len=4)  # len 2
+
+    x, y = dataset[-1]
+    assert x.tolist() == [14, 15, 16, 17]
+    assert y.tolist() == [15, 16, 17, 18]
+    for index in [2, -3]:
+        with pytest.raises(IndexError):
+            dataset[index]
+
+
+def test_from_npy_shards_concatenate_without_crossing_shards(tmp_path):
+    from upwash.core.data import ConcatDataset, DataLoader
+
+    (tmp_path / "000000").mkdir()
+    (tmp_path / "000001").mkdir()
+    shards = [
+        # 10 tokens -> 2 samples; token 9 is left over and dropped.
+        PackedTokenDataset.from_npy(write_npy_tokens(tmp_path / "000000" / "tokens.npy", range(0, 10)), seq_len=4),
+        # 5 tokens -> 1 sample.
+        PackedTokenDataset.from_npy(write_npy_tokens(tmp_path / "000001" / "tokens.npy", range(100, 105)), seq_len=4),
+    ]
+
+    dataset = ConcatDataset(shards)
+
+    assert len(dataset) == 3
+    x2, y2 = dataset[2]
+    assert x2.tolist() == [100, 101, 102, 103]
+    assert y2.tolist() == [101, 102, 103, 104]
+    batches = list(DataLoader(dataset, batch_size=2))
+    assert [tuple(x.shape) for x, _ in batches] == [(2, 4), (1, 4)]

@@ -102,10 +102,24 @@ def read_parquet_rows(path, columns):
 
 class PackedTokenDataset:
     def __init__(self, path, seq_len):
-        self.seq_len = seq_len
-        self.tokens = np.memmap(path, dtype="<u4", mode="r")
-        if self.seq_len <= 0:
+        tokens = np.memmap(path, dtype="<u4", mode="r")
+        self._setup(tokens, seq_len)
+        
+
+    @classmethod
+    def from_npy(cls, path, seq_len):
+        self = cls.__new__(cls)
+        tokens = np.load(path, mmap_mode="r", allow_pickle=False)
+        self._setup(tokens, seq_len)
+        return self
+
+
+    def _setup(self, tokens, seq_len):
+        if seq_len <= 0:
             raise ValueError(f"seq_len must be positive, got {seq_len}")
+        self.tokens = tokens
+        self.seq_len = seq_len
+
 
     def __len__(self):
         return (len(self.tokens) -1 ) //self.seq_len

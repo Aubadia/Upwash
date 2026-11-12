@@ -10,7 +10,9 @@ Read [Architecture.md](../docs/Architecture.md), [Trainer.md](../docs/Trainer.md
 
 As of 2026-11-09, PRs #1–#4 are merged. `main` is at `7e60792`, and the full suite on it returns `62 passed` (Docker). Completed: tasks 001–012. Not started: 013 and 014 (remote logging) and the training gaps listed under [Gaps Toward the Lab Run](#gaps-toward-the-lab-run).
 
-Data area, current task: [015 — Read many shards as one dataset, with a sample budget](015-multi-shard-dataset.md), on branch `feat/multi-shard-dataset`. Agreed interface: `ConcatDataset(datasets)` and `Truncate(dataset, num_samples)`. Red verified on 2026-11-12: `ImportError` for both names. The user implemented both classes, and Green was reached the same day: `21 passed` for the task, full suite `83 passed`. A read-only check on the real shard gives the expected lengths and `(8, 4096)` batches. Next: commit and open a pull request, then seeded shuffle.
+Data area, current task: [015 — Read many shards as one dataset, with a sample budget](015-multi-shard-dataset.md), on branch `feat/multi-shard-dataset`. Agreed interface: `ConcatDataset(datasets)` and `Truncate(dataset, num_samples)`. Red verified on 2026-11-12: `ImportError` for both names. The user implemented both classes, and Green was reached the same day: `21 passed` for the task, full suite `83 passed`. A read-only check on the real shard gives the expected lengths and `(8, 4096)` batches. Committed as `41f8bca`, not yet pushed.
+
+Next data task, in the same pull request: [016 — Read Flock's pre-tokenized `.npy` shards](016-npy-token-shard.md). Agreed interface: `PackedTokenDataset.from_npy(path, seq_len)`. Red verified on 2026-11-12: six new cases failed with `AttributeError` (no `from_npy`). The user implemented it, and Green was reached the same day: `21 passed` in the file, full suite `89 passed`. A read-only check on a real Flock `tokens.npy` confirms memory-mapping, `len` 15,395, and `(8, 4096)` batches. Still open: verifying the Flock data's dev-set exclusion. Next: commit, push, and open the pull request for 015 and 016, then seeded shuffle.
 
 Configuration (010), MemoryLogger (011), and Builder (012) are implemented and verified Green. Current task is [013 — Shared wandb SDK adapter](013-wandb-logger.md): agree on adapter API, exact SDK version, and dependency/test setup before the first test. The same adapter is planned for W&B or Flock; SDK compatibility and actual server delivery remain unverified.
 
@@ -60,7 +62,7 @@ Task [009](009-packed-token-dataset.md) merged into `main` through PR #3. `Packe
 
 The lab target is a 1B Llama-3.2-style model trained on 200B FineWeb-Edu tokens with context 4096 and evaluated by Flock. This list is the agent's gap analysis against `main`. It has not been agreed, ordered, or assigned.
 
-- Data: a seeded shuffle (reading many shards and a token budget are done in task 015), a resume position, per-rank sharding, and tokenizing about 200B tokens. One file took about 31 minutes for 0.73B tokens, so a single process needs on the order of 140 hours.
+- Data: a seeded shuffle (reading many shards and a token budget are done in task 015), a resume position, per-rank sharding, and tokenizing about 200B tokens. One file took about 31 minutes for 0.73B tokens, so a single process needs on the order of 140 hours. Task 016 instead reads Flock's pre-tokenized `.npy` shards, synced to local disk.
 - Model: no Llama implementation yet (RMSNorm, RoPE, grouped-query attention, SwiGLU, tied embeddings), and no decision between writing one and depending on one.
 - Training loop: no per-step loss output, learning-rate schedule (warmup and decay), gradient clipping, gradient accumulation, weight-decay parameter groups, bf16 mixed precision, device placement, checkpoint save and resume, multi-GPU training, or validation loss.
 - Logging: the wandb adapter (013) and Flock delivery (014). Both depend on `train()` exposing a per-step loss.
@@ -86,6 +88,7 @@ Tasks 001–008 keep their numbers. The configuration and logging tasks moved to
 | [011](011-metric-logger.md) | Batch scalar metrics in memory, ordered independent records, input isolation. | Four logger tests; full suite `42 passed` on 2026-11-09. | Green for tested memory scope. |
 | [012](012-build-trainer.md) | Build configured optimizer and Trainer with optional logger storage. | Two unit cases and two real-SGD integration cases; full suite `46 passed`. | Green; no automatic metric emission. |
 | [015](015-multi-shard-dataset.md) | Read many shards as one dataset and keep the first `num_samples` samples. | Ordered index mapping, empty parts skipped, negative and out-of-range indices, no crossing between real shards, budget checks. | Green: `21 passed`, full suite `83 passed`. |
+| [016](016-npy-token-shard.md) | Read Flock's `int32` `.npy` shards with `PackedTokenDataset.from_npy`. | Same samples as `.bin`, `int64` with large ids, `seq_len` and index checks, two `.npy` shards in `ConcatDataset`; real Flock file memory-mapped. | Green: `21 passed` in the 009 file, full suite `89 passed`. |
 
 Detailed implementation iterations, test commands, and failures remain in each task document. Returned-state snapshot semantics and partial-failure recovery remain deferred. Custom operation kernels are not required for this milestone.
 
