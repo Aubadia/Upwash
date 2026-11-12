@@ -15,12 +15,6 @@ def next_token_loss(logits, labels):
     return F.cross_entropy(logits.reshape(-1, logits.size(-1)), labels.reshape(-1))
 
 
-def mean_loss(trainer, loader):
-    with torch.no_grad():
-        losses = [trainer.compute_loss(x, y).item() for x, y in loader]
-    return sum(losses) / len(losses)
-
-
 def test_tiny_language_model_learns_next_token_from_a_packed_shard(tmp_path):
     # A repeating sequence 0..7: the next token is always (t + 1) % 8, so a model
     # that looks only at the current token can learn it exactly.
@@ -45,13 +39,15 @@ def test_tiny_language_model_learns_next_token_from_a_packed_shard(tmp_path):
     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
     trainer = Trainer(model=model, loss_fn=next_token_loss, optimizer=optimizer)
 
-    initial_loss = mean_loss(trainer, loader)
+    initial = trainer.evaluate(loader)
     for _ in range(30):
         state = trainer.train(loader)
-    final_loss = mean_loss(trainer, loader)
+    final = trainer.evaluate(loader)
 
     # (65 - 1) // 4 = 16 samples -> 4 batches per pass.
     assert state.global_step == 4
     # Uniform guessing over 8 tokens costs ln 8 ~= 2.08; a learned rule costs ~0.
-    assert initial_loss > 1.0
-    assert final_loss < 0.05
+    assert initial["num_targets"] == 64
+    assert final["num_targets"] == 64
+    assert initial["loss"] > 1.0
+    assert final["loss"] < 0.05

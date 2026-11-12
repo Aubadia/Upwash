@@ -39,4 +39,25 @@ class Trainer:
         # logger.log() when needed
 
         return self.state
+
+    def evaluate(self, batches) -> dict:
+        prev_training = self.model.training
+        total_loss = 0.0
+        total_num = 0
+
+        try:
+            self.model.eval()
+            with torch.no_grad():
+                for inputs, targets in batches:
+                    loss = self.compute_loss(inputs, targets)
+                    # Weighted loss, since the last shard may be truncated
+                    total_loss += loss.item() * targets.numel()
+                    total_num += targets.numel()
         
+            if total_num == 0:
+                raise ValueError("num_targets is 0")
+            eval_loss = total_loss / total_num
+        finally:
+            self.model.train(prev_training)
+
+        return {"loss": eval_loss, "num_targets": total_num}

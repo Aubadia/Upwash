@@ -1,8 +1,49 @@
 # Implementation Progress
 
-Last updated: 2026-11-12 (Asia/Taipei).
+Last updated: 2026-11-13 (Asia/Taipei).
 
 ## Resume Here
+
+Current direction: resume [017 — Self-Written Evaluation](017-small-evaluation.md).
+On 2026-11-13 the user stopped [018's Flock evaluation integration](018-flock-final-evaluation.md)
+and requested a self-written evaluator. Reuse `Trainer.evaluate`; the scope
+question is pending: FineWeb-Edu dev loss/PPL first, or all three benchmark
+families. No new evaluation API/tests or dependencies are introduced until the
+scope is clear. Flock logging in task 013 is separate. Do not delete the user's
+Flock checkout or continue its setup. Most recent full suite: `99 passed in
+1.96s` (before this scope change); current targeted result is recorded in 017.
+Next: settle custom evaluation scope and data preprocessing, then identify the
+smallest missing behavior for the next TDD step. The supplied lab requirements
+still specify Flock for official scoring; acceptance of a substitute is unconfirmed.
+
+Previous task: [017 — Small Development Evaluation](017-small-evaluation.md).
+The user accepted a small local dev evaluation and final scoring through Flock.
+Agreed first API: `Trainer.evaluate(batches)` returns `{"loss": float,
+"num_targets": int}` using target-weighted mean loss for dense, unpadded targets
+and a mean-reduced supplied loss; the LM caller derives perplexity.
+On branch `feat/Trainer-Log` at `1d2dc74` (PR #6 merged), the user implemented
+`evaluate` and moved mode restoration to `finally`. Latest checks on 2026-11-13:
+targeted eval/training/LM command → `11 passed in 1.67s`; full `./test.sh` →
+`99 passed in 1.38s`. Weighted loss/types, eval mode/no-grad, normal/loss-error
+mode restoration, empty list/iterator rejection, and preservation of parameters,
+existing gradients, populated optimizer state, and training progress are Green.
+The tiny LM now uses public `evaluate` before/after real training: 64 targets,
+initial loss above 1, final loss below 0.05. New cases passed on first run;
+no artificial Red is claimed. The agent changed only tests/docs.
+Next: prepare a fixed real dev subset and agree on its preprocessing, then verify
+manual evaluation with a real causal LM before agreeing on automatic scheduling.
+Flock execution, GPU/masking/distributed behavior, and real dev metrics remain
+unverified. Detailed commands and historical failures are in 017.
+The older branch/next-action records below are historical context.
+
+Flock eval documentation was successfully read on 2026-11-12 at documentation
+revision `710e75a857969be3fefef67c50b3df016f15ef15`; details and links are in 017.
+Important: official `fineweb_edu` scores documents separately with 8192-token
+windows and rejects a shorter model context. A local 4096 packed eval remains a
+development diagnostic. Limited in-memory scoring is available through
+`prepare_task(..., limit=N)` and `score_prepared`. No Flock execution, package
+installation, or model export compatibility has been verified. Confirm the
+planned model can support 8192 before a long training run.
 
 Read [Architecture.md](../docs/Architecture.md), [Trainer.md](../docs/Trainer.md), and [013 — Flock Logger and Delivery Verification](013-flock-logger.md), then inspect the relevant source and tests. Former tasks 013 and 014 are merged into task 013. The agreed public class is `upwash.core.logger.FlockLogger`, implemented by the user in `core/logger/flock.py` and re-exported by `core/logger/__init__.py`. The test is `tests/unit/core/test_flock_logger.py`. The user writes production behavior; the agent supports design, tests, failure analysis, and documentation under [AGENTS.md](../AGENTS.md).
 

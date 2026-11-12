@@ -68,6 +68,19 @@ Multiple epochs, device management, gradient accumulation, mixed precision, sche
 
 No Hugging Face compatibility behavior or reference version has been selected. Before a differential comparison, agree on its scope and record the exact reference version according to AGENTS.md.
 
+## Subsequent Evaluation Extension
+
+The later [small evaluation extension](../roadmap/017-small-evaluation.md) adds
+`result = trainer.evaluate(batches)` with `loss` (Python float) and `num_targets`
+(Python int). For the initial dense, unpadded scope, the supplied scalar loss
+must be a mean over target elements, and evaluation weights each batch by
+`targets.numel()`. It uses eval mode/no-grad, restores the previous uniform mode
+on success or a loss exception, rejects empty input, and preserves existing
+gradients, parameters, optimizer state, and training progress. These behaviors
+and real tiny-LM training/evaluation are verified Green on 2026-11-13. Real dev
+subset preparation, automatic scheduling/logging, and final Flock scoring remain
+pending. This extension does not change the original training milestone above.
+
 ## References
 
 - [PyTorch: Optimizing Model Parameters](https://docs.pytorch.org/tutorials/beginner/basics/optimization_tutorial.html): the basic loss, backward, gradient clearing, and optimizer update flow.
