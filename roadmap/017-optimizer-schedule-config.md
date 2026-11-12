@@ -43,7 +43,7 @@ The sweep is about 48 runs at 150M: 20 + 2 + 9 + 3 + 5 + 4 + 5. Linear decay is 
 - **Decay to zero.** There is no `min_lr` field. All planned shapes reach zero at the end of decay. The agent cited Bergsma et al. 2025, "Straight to Zero" (arXiv 2502.15938), and the WSD schedules of Hägele et al. 2024.
 - **Muon uses `adjust_lr_fn="match_rms_adamw"`.** This matches the plan's grid, where AdamW lr is about 1.6 × Muon lr and both share a `c/d` weight decay. It is fixed in the future optimizer builder, not a config field. Whether it matches the teammates' 150M baseline still needs checking. Torch 2.15.0 in the lockfile provides `torch.optim.Muon(lr, weight_decay, momentum, nesterov, adjust_lr_fn, ...)`.
 - **Every field is required; there are no defaults.** A sweep config that forgets a value fails at construction.
-- **The builder passes only `lr` to `optimizer_factory`.** Task 012 forwarded `**config.optimizer.to_dict()`, which would hand Muon/AdamW fields to SGD. Building Muon plus AdamW with parameter groups is task 018.
+- **The builder passes only `lr` to `optimizer_factory`.** Task 012 forwarded `**config.optimizer.to_dict()`, which would hand Muon/AdamW fields to SGD. Building Muon plus AdamW with parameter groups is task 019.
 - **`ScheduleConfig` stays standalone.** It isn't composed into `TrainingConfig` until a top-level experiment config needs it.
 
 ## Agreed Interface
@@ -82,11 +82,11 @@ Invalid values raise `ValueError`. A missing field raises `TypeError` naming it.
 
 Deferred:
 
-- Schedule computation and the Muon/AdamW builder: task 018 and later.
-- `DataConfig`, `TrainingConfig` run settings (batch tokens, device, precision, `log_every`), `ModelConfig`, and a top-level experiment config.
+- Schedule computation and the Muon/AdamW builder: task 019 and later.
+- `DataConfig` (task 018), `TrainingConfig` run settings (batch tokens, device, precision, `log_every`), `ModelConfig`, and a top-level experiment config.
 - Non-float input types.
 
-Open questions for task 018 and later:
+Open questions for task 019 and later:
 
 - Batch tokens per scale.
 - Which parameters receive weight decay.
@@ -150,4 +150,4 @@ Red iterations during implementation:
 
 Review follow-up: a `TrainingConfig.to_dict()` without tests had returned `{"optimizer": OptimizerConfig(...)}`, an object instead of a nested dict. The user removed it. Recording configs with `FlockLogger(config=...)` will be designed with the top-level experiment config. The user also fixed the `decay_shape` annotation (`str`) and the error messages. Full suite after the fixes: `160 passed`.
 
-Status: complete for optimizer and schedule fields and validation. Next: task 018, which builds Muon plus AdamW with parameter groups from `OptimizerConfig`.
+Status: complete for optimizer and schedule fields and validation. Committed as `7a8ed2c`. Next: task 018 (`DataConfig`) in the same pull request. Task 019 builds Muon plus AdamW with parameter groups from `OptimizerConfig`.
