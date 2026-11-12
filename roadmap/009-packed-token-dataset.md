@@ -115,6 +115,8 @@ Verified Green — 2026-11-09. The user implemented both checks:
 
 Command (Docker): `uv run pytest -q tests/unit/core/test_packed_token_dataset.py` returned `15 passed`. Full suite: `62 passed`.
 
+Merged into `main` through PR #3 (`7e60792`); full suite on `main`: `62 passed`. The refinements below were not applied before merging and remain open.
+
 Refinements suggested to the user; no test covers either:
 
 - The check runs after `np.memmap`, so an invalid `seq_len` still opens the shard. The agreed order is to check first.

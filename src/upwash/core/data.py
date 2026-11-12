@@ -4,6 +4,7 @@ from pathlib import Path
 import pyarrow.parquet as pq
 import numpy as np
 import json
+import bisect
 
 
 
@@ -49,6 +50,50 @@ class DataLoader:
         else:
             return (len(self.dataset) + self.batch_size -1) // self.batch_size
 
+class ConcatDataset:
+    def __init__(self, datasets):
+        self.datasets = list(datasets)
+        self.ends = []
+        total = 0
+        for dataset in self.datasets:
+            total += len(dataset)
+            self.ends.append(total)
+
+    def __len__(self):
+        return self.ends[-1]
+
+    def __getitem__(self, i):
+        n = len(self)
+        if i < 0:
+            i += n
+        if i < 0 or i >= n:
+            raise IndexError(f"index {i} out of range for {n} samples")
+        
+        k = bisect.bisect_right(self.ends, i) # use binary search
+        start = 0 if k == 0 else self.ends[k-1]
+        return self.datasets[k][i - start]
+        
+        
+
+class Truncate:
+    def __init__(self, dataset, num_samples):
+        if (num_samples < 0 or num_samples > len(dataset)):
+            raise ValueError(f"num_samples must be in [0, {len(dataset)}], got {num_samples}")
+        self.dataset = dataset
+        self.num_samples = num_samples
+
+    def __len__(self):
+        return self.num_samples
+        
+    def __getitem__(self, i):
+        n = self.num_samples
+        if i < 0:
+            i += n
+        if i < 0 or i >= n:
+            raise IndexError(f"index {i} out of range for {n} samples")
+        return self.dataset[i]
+
+
 
 def read_parquet_rows(path, columns):
     for batch in pq.ParquetFile(path).iter_batches(columns=columns):
@@ -57,10 +102,24 @@ def read_parquet_rows(path, columns):
 
 class PackedTokenDataset:
     def __init__(self, path, seq_len):
-        self.seq_len = seq_len
-        self.tokens = np.memmap(path, dtype="<u4", mode="r")
-        if self.seq_len <= 0:
+        tokens = np.memmap(path, dtype="<u4", mode="r")
+        self._setup(tokens, seq_len)
+        
+
+    @classmethod
+    def from_npy(cls, path, seq_len):
+        self = cls.__new__(cls)
+        tokens = np.load(path, mmap_mode="r", allow_pickle=False)
+        self._setup(tokens, seq_len)
+        return self
+
+
+    def _setup(self, tokens, seq_len):
+        if seq_len <= 0:
             raise ValueError(f"seq_len must be positive, got {seq_len}")
+        self.tokens = tokens
+        self.seq_len = seq_len
+
 
     def __len__(self):
         return (len(self.tokens) -1 ) //self.seq_len
