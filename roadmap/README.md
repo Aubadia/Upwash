@@ -1,12 +1,16 @@
 # Implementation Progress
 
-Last updated: 2026-11-09 (Asia/Taipei).
+Last updated: 2026-11-12 (Asia/Taipei).
 
 ## Resume Here
 
 Read [Architecture.md](../docs/Architecture.md), [Trainer.md](../docs/Trainer.md), and [013 — Shared wandb SDK adapter](013-wandb-logger.md), then inspect the relevant source and tests. The initial MemoryLogger batch interface is agreed; the task 012 Builder interface with optional logger injection is also agreed; remote adapter proposals still need agreement before tests. The user writes production code; the agent supports design, tests, failure analysis, and documentation under [AGENTS.md](../AGENTS.md).
 
 ## Current Position
+
+As of 2026-11-09, PRs #1–#4 are merged. `main` is at `7e60792`, and the full suite on it returns `62 passed` (Docker). Completed: tasks 001–012. Not started: 013 and 014 (remote logging) and the training gaps listed under [Gaps Toward the Lab Run](#gaps-toward-the-lab-run).
+
+Data area, current task: [015 — Read many shards as one dataset, with a sample budget](015-multi-shard-dataset.md), on branch `feat/multi-shard-dataset`. Agreed interface: `ConcatDataset(datasets)` and `Truncate(dataset, num_samples)`. Red verified on 2026-11-12: `ImportError` for both names. The user implemented both classes, and Green was reached the same day: `21 passed` for the task, full suite `83 passed`. A read-only check on the real shard gives the expected lengths and `(8, 4096)` batches. Next: commit and open a pull request, then seeded shuffle.
 
 Configuration (010), MemoryLogger (011), and Builder (012) are implemented and verified Green. Current task is [013 — Shared wandb SDK adapter](013-wandb-logger.md): agree on adapter API, exact SDK version, and dependency/test setup before the first test. The same adapter is planned for W&B or Flock; SDK compatibility and actual server delivery remain unverified.
 
@@ -50,7 +54,18 @@ Tasks [007](007-load-dataset.md) and [008](008-write-token-shard.md) retain thei
 
 Task 008 merged into `main` through PR #2. The skip-on-rerun check of the script has not been reported to the agent yet.
 
-Task [009](009-packed-token-dataset.md) is on branch `feat/packed-token-dataset` (PR #3). `PackedTokenDataset(path, seq_len)` memory-maps a `"<u4"` shard and returns `int64` `(x, y)` next-token pairs for `DataLoader`. A tiny LM trained through `DataLoader` and `Trainer` reaches loss below `0.05`. The real 008 shard with `seq_len=4096` yields 178,680 samples and `(8, 4096)` batches. On 2026-11-09, `main` (with tasks 010–012) was merged into the branch. The only conflict was this README. Full suite (Docker): `54 passed`. PR #3 review then asked for argument and index checks. `seq_len <= 0` now raises `ValueError`, negative indices count from the last sample, and out-of-range indices raise `IndexError`. Green: `15 passed` in the 009 unit file, full suite `62 passed`. Next: the user's two suggested refinements (check before opening the shard; report the caller's index), then commit and push PR #3. After that, for the data area: multiple shards, seeded shuffle, token budget, resume, and distributed sharding.
+Task [009](009-packed-token-dataset.md) merged into `main` through PR #3. `PackedTokenDataset(path, seq_len)` memory-maps a `"<u4"` shard and returns `int64` `(x, y)` next-token pairs for `DataLoader`. A tiny LM trained through `DataLoader` and `Trainer` reaches loss below `0.05`. The real 008 shard with `seq_len=4096` yields 178,680 samples and `(8, 4096)` batches. On 2026-11-09, `main` (with tasks 010–012) was merged into the branch. The only conflict was this README. Full suite (Docker): `54 passed`. PR #3 review then asked for argument and index checks. `seq_len <= 0` now raises `ValueError`, negative indices count from the last sample, and out-of-range indices raise `IndexError`. Green: `15 passed` in the 009 unit file, full suite `62 passed`. PR #3 merged without the two suggested refinements. Both are still open and optional: check `seq_len` before opening the shard, and report the caller's index in the `IndexError` message. Only one real shard exists locally (`sample/10BT/000_00000.bin`, about 0.73B tokens).
+
+## Gaps Toward the Lab Run
+
+The lab target is a 1B Llama-3.2-style model trained on 200B FineWeb-Edu tokens with context 4096 and evaluated by Flock. This list is the agent's gap analysis against `main`. It has not been agreed, ordered, or assigned.
+
+- Data: a seeded shuffle (reading many shards and a token budget are done in task 015), a resume position, per-rank sharding, and tokenizing about 200B tokens. One file took about 31 minutes for 0.73B tokens, so a single process needs on the order of 140 hours.
+- Model: no Llama implementation yet (RMSNorm, RoPE, grouped-query attention, SwiGLU, tied embeddings), and no decision between writing one and depending on one.
+- Training loop: no per-step loss output, learning-rate schedule (warmup and decay), gradient clipping, gradient accumulation, weight-decay parameter groups, bf16 mixed precision, device placement, checkpoint save and resume, multi-GPU training, or validation loss.
+- Logging: the wandb adapter (013) and Flock delivery (014). Both depend on `train()` exposing a per-step loss.
+- Evaluation hand-off: the checkpoint format Flock evaluation expects has not been confirmed.
+- Optional: μP (per-group learning rates, output multiplier, coordinate check). It covers width only, and the lab has not said whether it is required.
 
 Tasks 001–008 keep their numbers. The configuration and logging tasks moved to 010–014, and 009 is the packed-token dataset.
 
@@ -70,6 +85,7 @@ Tasks 001–008 keep their numbers. The configuration and logging tasks moved to
 | [010](010-training-config.md) | Composed optimizer settings with finite nonnegative learning rate. | Six config cases pass locally on 2026-11-09; prior branch-local full suite `25 passed`. | Green for tested Python-float scope. |
 | [011](011-metric-logger.md) | Batch scalar metrics in memory, ordered independent records, input isolation. | Four logger tests; full suite `42 passed` on 2026-11-09. | Green for tested memory scope. |
 | [012](012-build-trainer.md) | Build configured optimizer and Trainer with optional logger storage. | Two unit cases and two real-SGD integration cases; full suite `46 passed`. | Green; no automatic metric emission. |
+| [015](015-multi-shard-dataset.md) | Read many shards as one dataset and keep the first `num_samples` samples. | Ordered index mapping, empty parts skipped, negative and out-of-range indices, no crossing between real shards, budget checks. | Green: `21 passed`, full suite `83 passed`. |
 
 Detailed implementation iterations, test commands, and failures remain in each task document. Returned-state snapshot semantics and partial-failure recovery remain deferred. Custom operation kernels are not required for this milestone.
 

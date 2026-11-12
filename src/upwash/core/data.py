@@ -4,6 +4,7 @@ from pathlib import Path
 import pyarrow.parquet as pq
 import numpy as np
 import json
+import bisect
 
 
 
@@ -48,6 +49,50 @@ class DataLoader:
             return len(self.dataset) // self.batch_size
         else:
             return (len(self.dataset) + self.batch_size -1) // self.batch_size
+
+class ConcatDataset:
+    def __init__(self, datasets):
+        self.datasets = list(datasets)
+        self.ends = []
+        total = 0
+        for dataset in self.datasets:
+            total += len(dataset)
+            self.ends.append(total)
+
+    def __len__(self):
+        return self.ends[-1]
+
+    def __getitem__(self, i):
+        n = len(self)
+        if i < 0:
+            i += n
+        if i < 0 or i >= n:
+            raise IndexError(f"index {i} out of range for {n} samples")
+        
+        k = bisect.bisect_right(self.ends, i) # use binary search
+        start = 0 if k == 0 else self.ends[k-1]
+        return self.datasets[k][i - start]
+        
+        
+
+class Truncate:
+    def __init__(self, dataset, num_samples):
+        if (num_samples < 0 or num_samples > len(dataset)):
+            raise ValueError(f"num_samples must be in [0, {len(dataset)}], got {num_samples}")
+        self.dataset = dataset
+        self.num_samples = num_samples
+
+    def __len__(self):
+        return self.num_samples
+        
+    def __getitem__(self, i):
+        n = self.num_samples
+        if i < 0:
+            i += n
+        if i < 0 or i >= n:
+            raise IndexError(f"index {i} out of range for {n} samples")
+        return self.dataset[i]
+
 
 
 def read_parquet_rows(path, columns):
