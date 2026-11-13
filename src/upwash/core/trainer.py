@@ -188,7 +188,6 @@ class Trainer:
                 metrics["eval/perplexity"] = math.inf
         return metrics
 
-
     def _log_metrics(self, metrics, step, interval):
         """Wrapper function to log without excluded time"""
         if metrics and self.logger is not None:

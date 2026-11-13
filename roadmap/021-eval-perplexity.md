@@ -87,4 +87,24 @@ Cosmetic, open:
 - `if self.eval_perplexity == True:` can be `if self.eval_perplexity:`.
 - `eval_perplexity=False` in `Trainer.__init__` has no trailing comma.
 
-Status: complete in code and tests, on branch `feat/eval-perplexity`, not yet committed. Next for evaluation: internal dev data, then Flock `fineweb_edu` scoring.
+## Internal Dev Data — 2026-11-14
+
+The user wrote `scripts/prepare_dev.py`. It calls the existing `prepare_token_shards` on `cerulean-works/fineweb-edu-dev` at revision `2484afe000a6fdf442ba2396391a3bec12644903`, file `data/validation-*.parquet` (columns `id`, `text`, `url`, `dump`). Other settings:
+
+- Tokenizer `meta-llama/Llama-3.2-1B` at `4e20de362430cd3b72f300e6b0f18e50e7166e08`, with BOS prepended in `tokenize`. `write_token_shard` appends EOS, so each document is `[BOS, text, EOS]`, like the training data.
+- `exclude_ids=set()`.
+- Output in `.cache/dev-tokens/`, separate from the training shards in `.cache/tokens/`, so a training glob can't pick up dev data.
+
+The user's Mac is Intel (`macosx_15_0_x86_64`), and torch 2.15.0 has no wheel for it. The script therefore ran in Docker (`upwash-venv-pr5`). A native `uv run` attempt removed the local `.venv` and failed to recreate it. Use Docker for tests and scripts on this machine.
+
+The user ran it and got `{'num_files': 1, 'num_docs': 5000, 'num_excluded': 0, 'num_tokens': 5360078}`.
+
+Agent check of `.cache/dev-tokens/data/validation-00000-of-00001.bin`, read-only:
+
+- 5,360,078 tokens, with 5,000 BOS (128000) and 5,000 EOS (128001). The file starts with BOS and ends with EOS. Every BOS after the first follows an EOS, and every EOS before the last is followed by a BOS. The maximum id is 128001.
+- Document length in tokens: minimum 65, median 732, maximum 102,722. 22 documents are longer than 8192.
+- `PackedTokenDataset(path, 4096)` gives 1,308 samples, and the final 2,509 tokens are dropped as a partial sample. A `DataLoader(batch_size=8)` batch is `(8, 4096)` `int64` and starts with BOS, with `y` shifted by one.
+
+Rough cost: one evaluation is a forward pass over 5.36M tokens, about `2·N·D` = 1.6e15 FLOPs at 150M and 1.1e16 at 1B. That is seconds to tens of seconds on one H100, so the full set can be used at every evaluation.
+
+Status: code and tests complete, and dev data prepared. On branch `feat/eval-perplexity`, not yet committed, including `scripts/prepare_dev.py`. Next for internal evaluation: wire `dev_loader` and `eval_perplexity=True` into the entry script, with `eval_steps` at most 10% of total steps. Next for Flock: `fineweb_edu` scoring after training.
