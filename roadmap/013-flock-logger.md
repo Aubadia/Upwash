@@ -2,6 +2,12 @@
 
 ## Status and Scope
 
+2026-11-13 follow-up: [019 — Training Loop Logging](019-training-loop-logging.md)
+now covers computing/emitting metrics from Trainer with opt-in `logging_steps`
+configured through TrainingConfig/Builder. The older no-automatic-emission scope
+below describes task 013's logger adapter; default logging remains disabled in
+019's initial design. Real remote delivery is still unverified.
+
 Merged former tasks 013 (run adapter) and 014 (Flock delivery verification) at the user's request on 2026-11-12. Depends on the shared logging interaction from [011](011-metric-logger.md); [012](012-build-trainer.md) is complete. Flock is the only requested remote destination. The public class name is now agreed as FlockLogger, implemented by the user in `src/upwash/core/logger/flock.py` and re-exported through `src/upwash/core/logger/__init__.py`.
 
 The constructor, seven-metric forwarding, and exit-callback unit tests are Green. Actual SDK serialization, executable server compatibility, and Flock delivery remain unverified. Completing the unit tests alone does not complete this task: actual Flock delivery must also be checked. W&B service support is outside scope.

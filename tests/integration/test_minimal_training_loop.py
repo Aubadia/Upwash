@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import pytest
 import torch
 
@@ -93,3 +95,38 @@ def test_train_counts_steps_per_call_and_continues_updating_parameters():
             rtol=1e-6,
             atol=1e-6,
         )
+
+
+def test_evaluate_preserves_parameters_existing_gradients_optimizer_and_progress():
+    with torch.random.fork_rng(devices=[]):
+        model = torch.nn.Linear(1, 1, bias=False, device="cpu", dtype=torch.float32)
+    with torch.no_grad():
+        model.weight.zero_()
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+    trainer = Trainer(
+        model=model,
+        loss_fn=torch.nn.MSELoss(reduction="mean"),
+        optimizer=optimizer,
+    )
+    batch = (torch.tensor([[1.0]]), torch.tensor([[2.0]]))
+    state = trainer.train([batch, batch])
+    assert state.global_step == 2
+    assert model.weight.grad is not None
+    assert torch.count_nonzero(model.weight.grad).item() > 0
+
+    weight_before = model.weight.detach().clone()
+    gradient_before = model.weight.grad.clone()
+    optimizer_before = deepcopy(optimizer.state_dict())
+    # Real momentum state makes this check sensitive to optimizer changes.
+    assert optimizer_before["state"]
+
+    trainer.evaluate([(torch.tensor([[3.0]]), torch.tensor([[9.0]]))])
+
+    torch.testing.assert_close(model.weight, weight_before, rtol=0, atol=0)
+    assert model.weight.grad is not None
+    torch.testing.assert_close(model.weight.grad, gradient_before, rtol=0, atol=0)
+    torch.testing.assert_close(
+        optimizer.state_dict(), optimizer_before, rtol=0, atol=0
+    )
+    assert trainer.state.global_step == 2
+    assert state.global_step == 2

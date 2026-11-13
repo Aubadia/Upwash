@@ -29,7 +29,7 @@ class OptimizerConfig:
         return asdict(self)
 
 @dataclass
-class ScheduleConfig: 
+class ScheduleConfig:
     warmup_ratio: float
     decay_ratio: float
     decay_shape: str
@@ -72,7 +72,7 @@ class DataConfig:
 
     def to_dict(self):
         return asdict(self)
-    
+
 
 @dataclass
 class ModelConfig:
@@ -93,15 +93,15 @@ class ModelConfig:
             value = getattr(self, name)
             if not value > 0:
                 raise ValueError(f"{name} must be positive, got {value}")
-        
+
         if not (self.d_model % self.n_heads == 0):
             raise ValueError("d_model must be divied by n_heads")
         if not (self.n_heads % self.n_kv_heads == 0):
             raise ValueError("n_heads must be divied by n_kv_heads")
-        
+
         if not (self.head_dim % 2 == 0):
             raise ValueError
-        
+
         for name in ("rope_theta", "norm_eps", "embedding_std", "output_std_coeff"):
             value = getattr(self, name)
             if not (math.isfinite(value) and value > 0):
@@ -109,7 +109,7 @@ class ModelConfig:
 
     def to_dict(self):
         return asdict(self)
-    
+
     def num_parameters(self):
         d = self.d_model
         kv_dim = self.n_kv_heads * self.head_dim
@@ -121,11 +121,13 @@ class ModelConfig:
         per_layer_= attention + mlp + norms
         return self.vocab_size * d + self.n_layers * per_layer_ + d
 
-    
+
     @property
     def head_dim(self):
         return self.d_model // self.n_heads
 
 class TrainingConfig:
-    def __init__(self, optimizer: OptimizerConfig) -> None:
+    def __init__(self, optimizer: OptimizerConfig, logging_steps=None, eval_steps=None) -> None:
         self.optimizer = optimizer
+        self.logging_steps = logging_steps
+        self.eval_steps = eval_steps

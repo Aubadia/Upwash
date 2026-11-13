@@ -1,8 +1,236 @@
 # Implementation Progress
 
-Last updated: 2026-11-12 (Asia/Taipei).
+Last updated: 2026-11-13 (Asia/Taipei).
 
 ## Resume Here
+
+Current priority: [019 — Training Loop Logging](019-training-loop-logging.md).
+Merge verification: integrated `origin/main` at `fccd286` into
+`feat/Trainer-Log`. Resolved config/Builder conflicts by retaining the required
+Muon/AdamW fields, data/model/schedule configs and dataset builder, plus Trainer
+logging/token/evaluation wiring. The generic optimizer factory receives only
+`lr`; logging/evaluation tests use the full optimizer-config fixture.
+`./test.sh` → exit 0, `276 passed in 2.21s`. Trainer's refactor is unchanged.
+Next: explicit LM perplexity opt-in as described in the logging task.
+
+Automatic `eval/loss` is implemented: config/Builder/Trainer wire `eval_steps`,
+and `train(..., eval_batches=...)` runs interval/final evaluations with no
+duplicate final checkpoint. Coincident and final train/eval metrics share an
+event; eval-only and no-logger runs are supported. Differing schedules exclude
+evaluation/logging time from throughput. Existing defaults remain optional.
+Targeted scheduled-eval/logging/manual-eval command → exit 0,
+`30 passed in 1.60s`; full `./test.sh` → exit 0, `123 passed in 1.43s`.
+Next: agree on explicit LM perplexity opt-in and add its first numerical test.
+Interval validation, reusable-dev enforcement, real dev data, GPU/distributed
+behavior, and remote delivery remain unverified. See 019 for detailed evidence.
+Earlier records below are historical.
+
+Automatic `eval/loss` API is agreed: config `eval_steps=None`
+passes through Builder to Trainer; `train(..., eval_batches=dev_loader)` uses
+a reusable dev iterable every N updates and at completion, with no duplicate
+final evaluation. Coincident train/eval metrics share an event, and evaluation
+is excluded from throughput. Perplexity follows with explicit LM opt-in.
+Added two real-SGD integration cases for exact/final-partial evaluation at
+interval 2. Expected post-update weighted dev MSE: 1.7850666667/1.3659093333;
+train/eval metrics share events at steps [2] or [2, 3], without duplicate eval.
+Targeted scheduled-eval/logging command → `2 failed, 18 passed in 1.73s`;
+full `./test.sh` → `2 failed, 117 passed in 1.51s` (both exit 1).
+Intended Red: Config rejects eval_steps, before runtime assertions execute.
+Only tests/docs changed. Next: wire config/Builder/Trainer and add scheduled
+and final evaluation, then verify Green. Details and remaining cases are in 019.
+
+Throughput is implemented in both event paths. Interval tokens/time reset
+after logging and at the start of each training call; final-partial timing
+uses the last update's timestamp. Deterministic CPU cases verify padding,
+all-padding rates, loading/forward/backward/SGD inclusion, logger/exhaustion
+delay exclusion, repeated calls, evaluation gaps, and zero elapsed time.
+Default/explicit disabled counting omits throughput.
+`./test.sh tests/integration/test_training_logging.py` → exit 0,
+`18 passed in 1.61s`; full `./test.sh` → exit 0, `117 passed in 1.47s`.
+The original throughput case is Green. Next: agree on automatic evaluation
+inputs and scheduling before adding eval/loss and eval/perplexity emission.
+GPU/distributed timing and remote delivery remain unverified.
+Earlier records below are historical.
+
+Throughput timing is agreed: use existing `count_tokens=True`
+to emit interval non-padding tokens per elapsed second, including data loading
+and training computation, excluding logging, evaluation, and gaps between
+training calls. Complete/final-partial intervals use `time.perf_counter`.
+Added a deterministic CPU test: batches cost 5 seconds each (1 loading,
+2 forward, 1 backward, 1 SGD), logger calls cost 100 seconds. For 8/8/4 tokens,
+expected interval rates are 1.6/0.8 at steps 2/3. Training/update/count checks
+pass, then lookup raises `KeyError: 'train/tokens_per_second'`.
+Targeted logging tests → `1 failed, 14 passed in 1.40s`;
+full `./test.sh` → `1 failed, 113 passed in 1.41s` (both exit 1).
+Only tests/docs changed. Next: implement interval timing and emit throughput
+in both logging paths, then verify Green. Remaining timing cases are in 019.
+
+Token counting is implemented in Builder and Trainer with defaults
+`count_tokens=False`, `pad_token_id=None`. Enabled counting sums input tokens
+across training calls, excludes configured padding ids and evaluation, and
+continues while logging is disabled. Both event paths emit Python integers.
+Added coverage for padding ids 0/1, all-padding inputs, explicit/default
+disabled counting, repeated calls, evaluation exclusion, and logger omission.
+Targeted logging tests → exit 0, `14 passed in 1.40s`;
+full `./test.sh` → exit 0, `113 passed in 1.50s`.
+Next: agree on throughput timing boundaries and add a deterministic-clock test.
+Throughput, scheduled evaluation, GPU behavior, and remote delivery remain
+unverified. Earlier records below are historical.
+
+Previous Red: `count_tokens=True` with optional
+`pad_token_id`, replacing the callback proposal. Builder/Trainer default to
+disabled counting and no padding id. Added the first unpadded LM integration
+test: 8/8/4 input tokens must emit integer totals 16/20 at steps 2/3, with
+real cross-entropy/SGD updates. Baseline: `107 passed in 2.12s`.
+Targeted logging tests: `1 failed, 8 passed in 0.99s`; full `./test.sh`:
+`1 failed, 107 passed in 1.32s`. Intended Red: Builder rejects `count_tokens`;
+new training/payload assertions have not executed. Only tests/docs changed.
+Historical next action: add/wire the optional settings and log token totals in both
+event paths, then verify Green. Padding, lifetime cumulative counting,
+evaluation exclusion, disabled-count compatibility, and throughput follow.
+
+Latest verification: parameterized the one-update global L2 case to include an
+unused trainable parameter and a frozen parameter. Each stays at `100`, retains
+`grad is None`, and does not change the expected norm `sqrt(104)` or real SGD
+updates. `./test.sh tests/integration/test_training_logging.py` → exit 0,
+`8 passed in 1.46s`; full `./test.sh` → exit 0, `107 passed in 1.39s`.
+Both new cases passed on first execution; no Red is claimed. Only tests/docs
+changed. Next: agree on explicit LM token counting and interval timing before
+testing `train/total_tokens_seen` and `train/tokens_per_second`. No new API is
+agreed; generic regression inputs must not automatically count as tokens.
+
+Latest verification: extended the existing 2/3/4-update integration cases to
+assert last-update gradient norms at interval boundaries and the final partial
+interval, plus unchanged final gradients and correct SGD weights. Expected
+norms at steps 2/3/4 are `3.2`, `2.56`, and `2.048`.
+`./test.sh tests/integration/test_training_logging.py` → exit 0,
+`6 passed in 1.55s`; full `./test.sh` → exit 0, `105 passed in 1.37s`.
+All added assertions passed on first execution; no Red is claimed. Only
+tests/docs changed. Next: cover parameters without gradients, then agree on
+token-count/throughput policy before adding new metric tests.
+
+Latest implementation: Trainer computes global
+gradient L2 after backward and before the optimizer update, leaving gradients
+unchanged. Both interval and final-partial events include `train/grad_norm`
+from the last update. Scalar conversion occurs only when emitting an event.
+`./test.sh tests/integration/test_training_logging.py` → exit 0,
+`6 passed in 1.35s`. Full suite not rerun. Next: add multi-step/final-partial
+norm assertions; clipping/AMP and remote delivery remain unverified.
+Earlier records below are historical.
+
+Latest increment: added the one-update global L2 `train/grad_norm` test using
+real SGD, two weights, and a bias. Expected `sqrt(104)` from gradients
+`[-6, -8, -2]`; update/gradient/loss/LR assertions pass, then the metric lookup
+raises `KeyError: 'train/grad_norm'`. Baseline: `104 passed in 1.80s`.
+Targeted logging tests: `1 failed, 5 passed in 1.14s`; full `./test.sh`:
+`1 failed, 104 passed in 1.39s`. Only tests/docs changed.
+Next: user logs the global L2 norm without mutating gradients, then verify Green.
+Multi-step norm sampling, actual clipping timing, and final-partial norm logging
+are not established by this one-update case. Earlier records are historical.
+
+Latest: at the user's explicit implementation request, Trainer now captures
+single-group LR before optimizer updates and logs `train/learning_rate` beside
+loss in both interval and final-partial events. Targeted logging test:
+`5 passed in 1.66s`; full `./test.sh`: `104 passed in 1.66s`.
+Loss and single-group constant-LR logging are Green. Next: agree on gradient
+norm sampling (proposed global L2 before clipping on the last completed update),
+then add its smallest test. Multi-group LR naming, token/throughput policies,
+automatic evaluation inputs/schedule, and remote delivery remain pending.
+This implementation increment changed Trainer/docs; earlier results follow.
+
+The user requested coverage of the screenshot's seven metrics. The next small
+increment is single-group `train/learning_rate` in the existing loss events,
+including the final partial interval. Baseline: `102 passed in 1.88s`.
+New real-SGD cases (LR 0.1/0.05) confirm updates and steps 2/3, then fail with
+`KeyError: 'train/learning_rate'`. Targeted logging test: `2 failed, 3 passed
+in 1.46s`; full `./test.sh`: `2 failed, 102 passed in 1.68s`.
+Only tests/docs changed. Next: user adds LR to both event paths, then verify
+Green. Gradient norm, multi-group keys, token/throughput policy, and automatic
+eval inputs/schedule still require agreement before tests. Loss logging is
+Green; this does not establish logging of the other metrics or remote delivery.
+Earlier status/next-action entries below are historical.
+
+Current files default both Config and Trainer intervals to `None`; baseline
+`./test.sh` is Green: `100 passed in 1.91s`. Added exact-interval cases (2 and
+4 updates at interval 2) alongside the existing partial-interval case. All pass
+on first execution: logging/Builder/config regression command →
+`13 passed in 1.48s`. No artificial Red; the full suite was not rerun after
+these test-only changes. Only tests/docs changed in this increment.
+Next: verify training with an explicit interval and no logger, then agree on
+interval validation. Earlier failures and next-action entries below are historical.
+
+Latest full suite after the user set the config default to `10`:
+`./test.sh` → `2 failed, 98 passed in 1.99s`. Both built-Trainer cases expect
+disabled logging when omitted, but the default enables the final partial flush.
+Next: default the interval to `None` in config and Trainer, then rerun the suite.
+This diagnostic follow-up changed only documentation; earlier results follow.
+
+Follow-up full suite: `./test.sh` → `5 failed, 95 passed in 1.86s`.
+All five fail because existing callers omit the newly required
+`TrainingConfig.logging_steps`; interval logging passes. Next: user defaults
+the config interval to `None`, aligns Trainer's default for direct callers, and
+reruns the suite. This follow-up changed only documentation.
+
+Latest check: at the user's explicit implementation request, Trainer now emits
+interval mean loss and flushes the final partial interval. Logging plus Trainer
+loss/empty/evaluation tests pass: `12 passed in 1.54s`; full suite not run.
+Config and Builder wiring now reach the loop. Existing defaults still need to
+restore agreed omitted-setting compatibility (TrainingConfig requires the
+interval; Trainer defaults to 10). Next: resolve those defaults and cover exact
+interval completion/disabled logging. The initial Red recorded below is historical.
+
+On branch `feat/Trainer-Log`, HEAD `6476e04` (minimum evaluation committed), the
+user selected `logging_steps` on `TrainingConfig`, wired through Builder. First
+behavior: emit the mean of step losses every N completed optimizer updates and
+flush the final partial interval; omitted setting preserves disabled automatic
+logging. First integration test is Red: `TrainingConfig` rejects `logging_steps`.
+Latest `./test.sh` on 2026-11-13 → `1 failed, 99 passed in 1.83s`; baseline before
+the test was `99 passed in 2.07s`. Next: user adds/configures the interval and
+implements loop emission, then verify Green. Further metrics, cumulative remote
+steps, token-count policy, and scheduled eval are planned in 019, not yet tested.
+The agent changed only tests/docs. The self-written eval follow-up below is
+deferred while working on train-loop logging.
+
+Previous direction (deferred): [017 — Self-Written Evaluation](017-small-evaluation.md).
+On 2026-11-13 the user stopped [018's Flock evaluation integration](018-flock-final-evaluation.md)
+and requested a self-written evaluator. Reuse `Trainer.evaluate`; the scope
+question is pending: FineWeb-Edu dev loss/PPL first, or all three benchmark
+families. No new evaluation API/tests or dependencies are introduced until the
+scope is clear. Flock logging in task 013 is separate. Do not delete the user's
+Flock checkout or continue its setup. Most recent full suite: `99 passed in
+1.96s` (before this scope change); current targeted result is recorded in 017.
+Next: settle custom evaluation scope and data preprocessing, then identify the
+smallest missing behavior for the next TDD step. The supplied lab requirements
+still specify Flock for official scoring; acceptance of a substitute is unconfirmed.
+
+Previous task: [017 — Small Development Evaluation](017-small-evaluation.md).
+The user accepted a small local dev evaluation and final scoring through Flock.
+Agreed first API: `Trainer.evaluate(batches)` returns `{"loss": float,
+"num_targets": int}` using target-weighted mean loss for dense, unpadded targets
+and a mean-reduced supplied loss; the LM caller derives perplexity.
+On branch `feat/Trainer-Log` at `1d2dc74` (PR #6 merged), the user implemented
+`evaluate` and moved mode restoration to `finally`. Latest checks on 2026-11-13:
+targeted eval/training/LM command → `11 passed in 1.67s`; full `./test.sh` →
+`99 passed in 1.38s`. Weighted loss/types, eval mode/no-grad, normal/loss-error
+mode restoration, empty list/iterator rejection, and preservation of parameters,
+existing gradients, populated optimizer state, and training progress are Green.
+The tiny LM now uses public `evaluate` before/after real training: 64 targets,
+initial loss above 1, final loss below 0.05. New cases passed on first run;
+no artificial Red is claimed. The agent changed only tests/docs.
+Next: prepare a fixed real dev subset and agree on its preprocessing, then verify
+manual evaluation with a real causal LM before agreeing on automatic scheduling.
+Flock execution, GPU/masking/distributed behavior, and real dev metrics remain
+unverified. Detailed commands and historical failures are in 017.
+The older branch/next-action records below are historical context.
+
+Flock eval documentation was successfully read on 2026-11-12 at documentation
+revision `710e75a857969be3fefef67c50b3df016f15ef15`; details and links are in 017.
+Important: official `fineweb_edu` scores documents separately with 8192-token
+windows and rejects a shorter model context. A local 4096 packed eval remains a
+development diagnostic. Limited in-memory scoring is available through
+`prepare_task(..., limit=N)` and `score_prepared`. No Flock execution, package
+installation, or model export compatibility has been verified. Confirm the
+planned model can support 8192 before a long training run.
 
 Read [Architecture.md](../docs/Architecture.md), [Trainer.md](../docs/Trainer.md), and [013 — Flock Logger and Delivery Verification](013-flock-logger.md), then inspect the relevant source and tests. Former tasks 013 and 014 are merged into task 013. The agreed public class is `upwash.core.logger.FlockLogger`, implemented by the user in `core/logger/flock.py` and re-exported by `core/logger/__init__.py`. The test is `tests/unit/core/test_flock_logger.py`. The user writes production behavior; the agent supports design, tests, failure analysis, and documentation under [AGENTS.md](../AGENTS.md).
 

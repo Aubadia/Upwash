@@ -68,6 +68,72 @@ Multiple epochs, device management, gradient accumulation, mixed precision, sche
 
 No Hugging Face compatibility behavior or reference version has been selected. Before a differential comparison, agree on its scope and record the exact reference version according to AGENTS.md.
 
+## Subsequent Evaluation Extension
+
+The later [small evaluation extension](../roadmap/017-small-evaluation.md) adds
+`result = trainer.evaluate(batches)` with `loss` (Python float) and `num_targets`
+(Python int). For the initial dense, unpadded scope, the supplied scalar loss
+must be a mean over target elements, and evaluation weights each batch by
+`targets.numel()`. It uses eval mode/no-grad, restores the previous uniform mode
+on success or a loss exception, rejects empty input, and preserves existing
+gradients, parameters, optimizer state, and training progress. These behaviors
+and real tiny-LM training/evaluation are verified Green on 2026-11-13. Real dev
+subset preparation and final Flock scoring remain
+pending. This extension does not change the original training milestone above.
+
+## Scheduled Evaluation
+
+`TrainingConfig(eval_steps=N)` wires the interval through Builder to Trainer.
+`trainer.train(batches, eval_batches=dev_loader)` evaluates after every N
+completed updates and once at normal completion unless that step was already
+evaluated. The dev iterable must support repeated traversal; initially use
+dense, unpadded targets with a mean-reduced supplied loss, as in `evaluate()`.
+Scheduling is inactive when the interval or dev iterable is omitted.
+
+Evaluation runs independently of training logging and still runs without a
+logger. With a logger it emits `eval/loss`, combining coincident training and
+evaluation metrics in one event, including the final step. A step's metrics
+are retained until the next batch is fetched or training finishes, allowing
+final evaluation to join an event at an exact training-log boundary.
+Evaluation and logging time are excluded from training throughput, including
+when the logging and evaluation intervals differ. Evaluation preserves model
+mode and training gradients through the existing evaluator. Steps remain
+per-call; this increment does not add perplexity, validate interval values,
+or make a one-shot dev iterator reusable.
+
+## Token Counting Extension
+
+Trainer and `build_trainer` accept optional `count_tokens=False` and
+`pad_token_id=None`. With `count_tokens=True`, completed training updates add
+the number of input elements, excluding values equal to a configured padding
+id. Without a padding id, zero is a valid token. Targets are not counted.
+
+The total persists across `train()` calls on the same Trainer, including calls
+without a logger, and excludes `evaluate()`. Enabled interval and final-partial
+events include `train/total_tokens_seen` as a Python integer. Omitted or false
+`count_tokens` preserves generic training without token metrics. Padding
+exclusion changes this metric only; the supplied loss controls loss masking.
+Log steps retain their existing per-call semantics. These CPU behaviors are
+verified; GPU/distributed counting and checkpoint
+persistence of the counter are not established.
+
+## Throughput Logging
+
+With token counting and interval logging enabled, `train/tokens_per_second`
+reports each interval's non-padding input tokens divided by elapsed
+`time.perf_counter()` seconds. Timing starts before fetching the first batch
+and stops after the final update and token count in that interval. Data loading,
+forward, backward, and optimizer work are included; metric emission is excluded.
+The next interval starts after logging. A final partial interval uses the last
+update's timestamp, excluding the time spent discovering iterator exhaustion.
+
+Each `train()` call starts fresh interval tokens and timing, while
+`train/total_tokens_seen` continues accumulating. Evaluation and gaps between
+training calls do not affect the next interval's rate. Zero elapsed time emits
+`0.0`; all-padding intervals also emit `0.0`. Disabling token counting omits
+throughput. These behaviors are verified with a simulated clock and real CPU
+training; GPU synchronization and distributed throughput remain unverified.
+
 ## References
 
 - [PyTorch: Optimizing Model Parameters](https://docs.pytorch.org/tutorials/beginner/basics/optimization_tutorial.html): the basic loss, backward, gradient clearing, and optimizer update flow.

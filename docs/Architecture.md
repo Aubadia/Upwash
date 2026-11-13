@@ -64,6 +64,17 @@ Core uses shared contracts where tested interactions require them, keeping it in
 
 Batch iteration, forward/loss computation, and parameter updates need clear interaction points to accommodate gradient accumulation and update methods that require repeated loss computation. The agreed first supervised interface is `Trainer(model=model, loss_fn=loss_fn)` with `trainer.compute_loss(inputs, targets)`. Trainer holds the externally supplied model and loss function, calls `model(inputs)`, and returns `loss_fn(predictions, targets)` as a scalar tensor. The first training loop will interpret each batch as `(inputs, targets)`; this is the initial supported format, not a universal batch format. Additional calling conventions will be designed from concrete requirements. Task 002 now agrees on an externally constructed optimizer supplied through `Trainer(model=model, loss_fn=loss_fn, optimizer=optimizer)` and `state = trainer.train(batches)`. Following the user’s correction, optimizer injection is required, including when constructing Trainer for loss tests. The returned object exposes `global_step`.
 
+The subsequent small-evaluation extension is recorded in
+[task 017](../roadmap/017-small-evaluation.md). `Trainer.evaluate(batches)` reuses
+the supplied model/loss and `(inputs, targets)` batches, returning
+`{"loss": float, "num_targets": int}`. Initially the supplied loss is a mean over
+dense, unpadded targets; batch losses are weighted by target count. Evaluation
+uses eval mode and no-grad, restores the previous uniform model mode even on a
+loss error, and preserves training progress, parameters, gradients, and optimizer
+state. Empty input raises `ValueError`. LM callers derive perplexity only for
+natural-log cross-entropy. Automatic scheduling, actual dev data preparation,
+and final Flock evaluation remain separate work; core has no Flock dependency.
+
 ## Test Layers
 
 | Layer | What It Verifies | Principles |
