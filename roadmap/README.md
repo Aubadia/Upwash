@@ -1,6 +1,16 @@
 # Implementation Progress
 
-Last updated: 2026-11-13 (Asia/Taipei).
+Last updated: 2026-11-14 (Asia/Taipei).
+
+Merge verification: merged `origin/main` at `5d989c7` into `feat/Adaptor`.
+Resolved the progress-log conflict by retaining both branches' records. Adapted
+the incoming Builder precision test to the existing model/config SGD test
+factory. Initial `./test.sh --tb=short`: exit 1, `1 failed, 317 passed`
+because direct SGD rejected the factory's `config` keyword. After adapting the
+test: exit 0, `318 passed in 3.66s`; `git diff --check` passes. No current
+merge blocker. Next for task 020's HF adapter: tiny real HF Builder/Trainer
+integration. Both branches use task number 020; links identify their distinct
+documents, and renumbering remains deferred.
 
 Lab requirements are consolidated in [docs/Spec.md](../docs/Spec.md), including
 compute grants, exact token accounting, architecture, evaluation, forecasts,
@@ -209,7 +219,26 @@ Baseline recheck: model config `57 passed`; full `./test.sh` → exit 0,
 then verify Green. Initialization/output scaling need later tests. Logging work below
 remains pending separately.
 
-Current priority: [019 — Training Loop Logging](019-training-loop-logging.md).
+Device/precision work merged from `origin/main` (the following records describe that branch):
+
+Current task (2026-11-13): [020 — Device placement and bf16 mixed precision](020-device-precision.md), on branch `feat/gpu-bf16` from `main` at `c37845f`.
+
+- Agreed interface:
+  - Trainer moves each batch to the model's parameter device, in both `train` and `evaluate`. There is no `device` argument.
+  - `precision` is `"fp32"` (default, no autocast) or `"bf16"` (autocast around `compute_loss`, float32 parameters). Trainer raises `ValueError` for any other value.
+  - `TrainingConfig(..., precision="fp32")` passes through `build_trainer`.
+- Red verified: `17 failed, 46 passed` on the targeted files, and the rest of the suite gives `276 passed`.
+  - Device cases fail because batches reach a meta model unmoved.
+  - Precision cases fail with `TypeError` for `precision`.
+- Sanity check: a scratch reference implementation passed the full suite (`294 passed`).
+- Review found a dtype-less `torch.autocast`, which defaults to float16 on CUDA. Added a regression test that sets the CPU autocast default to float16, and confirmed Red.
+- Green: the user added validation and `dtype=torch.bfloat16`, and the full suite returned `296 passed`.
+- Real CUDA execution is not yet verified. Check it in the first nano4 smoke run.
+- Next: commit. GPU timing via `synchronize` and a CUDA-only test marker are deferred.
+
+Numbering (decided 2026-11-13): tasks continue after 019, so device and precision is 020. No number is reserved for the Muon + AdamW builder; it takes the next free number when it starts. Earlier records that call it "task 020" predate this decision. The duplicated 017–019 files from the evaluation and logging work still need renumbering, starting at 021.
+
+Logging work, previous priority: [019 — Training Loop Logging](019-training-loop-logging.md).
 Merge verification: integrated `origin/main` at `fccd286` into
 `feat/Trainer-Log`. Resolved config/Builder conflicts by retaining the required
 Muon/AdamW fields, data/model/schedule configs and dataset builder, plus Trainer

@@ -1,5 +1,5 @@
 import time
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 
 import torch
 
@@ -65,7 +65,10 @@ class Trainer:
         count_tokens=False,
         pad_token_id=None,
         eval_steps=None,
+        precision="fp32",
     ):
+        if precision not in ("fp32", "bf16"):
+            raise ValueError(f"precision must be 'fp32' or 'bf16', got {precision!r}")
         self.state = TrainingState()
         self.model = model
         self.loss_fn = loss_fn
@@ -77,6 +80,7 @@ class Trainer:
         self.pad_token_id = pad_token_id
         self.eval_steps = eval_steps
         self._total_tokens_seen = 0
+        self.precision = precision
 
     def compute_loss(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         predictions = self.model(inputs)
@@ -127,10 +131,23 @@ class Trainer:
             pending_metrics.update(interval.metrics(self._total_tokens_seen))
         self._log_metrics(pending_metrics, steps, interval)
         return self.state
+    
+    def _to_model_device(self, inputs, targets):
+        device = next(self.model.parameters()).device
+        return inputs.to(device), targets.to(device)
+    
+    def _autocast(self):
+        if self.precision == "bf16":
+            device = next(self.model.parameters()).device
+            return torch.autocast(device_type=device.type, dtype=torch.bfloat16)
+        else:
+            return nullcontext()
 
     def _training_step(self, inputs, targets, logging_enabled):
         self.optimizer.zero_grad()
-        loss = self.compute_loss(inputs, targets)
+        inputs, targets = self._to_model_device(inputs, targets)
+        with self._autocast():
+            loss = self.compute_loss(inputs, targets)
         loss.backward()
 
         metrics = {}
@@ -181,7 +198,9 @@ class Trainer:
             self.model.eval()
             with torch.no_grad():
                 for inputs, targets in batches:
-                    loss = self.compute_loss(inputs, targets)
+                    inputs, targets = self._to_model_device(inputs, targets)
+                    with self._autocast():
+                        loss = self.compute_loss(inputs, targets)
                     num_targets = targets.numel()
                     total_loss += loss.item() * num_targets
                     total_targets += num_targets

@@ -1,5 +1,15 @@
 # 020 — Hugging Face Llama Model Adaptor
 
+## Merge Verification — 2026-11-14
+
+Merged `origin/main` at `5d989c7`, including device placement and bf16 support.
+The incoming precision Builder test used the older direct-SGD factory; changed
+it to the existing `sgd_optimizer_factory` fixture without changing its bf16
+expectation. Initial full suite: `1 failed, 317 passed` (`config` keyword
+rejected by SGD). Final `./test.sh --tb=short`: exit 0,
+`318 passed in 3.66s`. No current merge blocker. Next remains tiny real HF
+Builder/Trainer training/evaluation with Muon/AdamW and WSD.
+
 ## Latest Green — Loss Adapter
 
 The user implemented `causal_lm_loss` using outputs.logits, flattening token

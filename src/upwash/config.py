@@ -127,7 +127,8 @@ class ModelConfig:
         return self.d_model // self.n_heads
 
 class TrainingConfig:
-    def __init__(self, optimizer: OptimizerConfig, logging_steps=None, eval_steps=None) -> None:
+    def __init__(self, optimizer: OptimizerConfig, logging_steps=None, eval_steps=None, precision="fp32") -> None:
         self.optimizer = optimizer
         self.logging_steps = logging_steps
         self.eval_steps = eval_steps
+        self.precision = precision
