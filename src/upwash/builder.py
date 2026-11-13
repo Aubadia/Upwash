@@ -13,7 +13,7 @@ def build_trainer(
         count_tokens=False,
         pad_token_id=None,
     ) -> Trainer:
-    optim = optimizer_factory(model.parameters(), lr=config.optimizer.lr)
+    optim = optimizer_factory(model, config=config.optimizer)
     return Trainer(
         model=model,
         loss_fn=loss_fn,

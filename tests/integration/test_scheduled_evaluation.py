@@ -17,7 +17,7 @@ from upwash.core.logger import MemoryLogger
     ids=["exact-interval", "final-partial-interval"],
 )
 def test_scheduled_evaluation_merges_loss_with_training_events_without_duplicates(
-    num_steps, expected_steps, expected_train_losses, expected_eval_losses, make_optimizer_config,
+    num_steps, expected_steps, expected_train_losses, expected_eval_losses, make_optimizer_config, sgd_optimizer_factory,
 ):
     with torch.random.fork_rng(devices=[]):
         model = torch.nn.Linear(1, 1, bias=False, device="cpu", dtype=torch.float32)
@@ -30,7 +30,7 @@ def test_scheduled_evaluation_merges_loss_with_training_events_without_duplicate
         ),
         model=model,
         loss_fn=torch.nn.MSELoss(reduction="mean"),
-        optimizer_factory=torch.optim.SGD,
+        optimizer_factory=sgd_optimizer_factory,
         logger=logger,
     )
     inputs = torch.ones((1, 1), dtype=torch.float32)
@@ -81,7 +81,7 @@ def test_scheduled_evaluation_merges_loss_with_training_events_without_duplicate
 
 @pytest.mark.parametrize("num_steps", [3, 4], ids=["final-log-boundary", "final-eval-boundary"])
 def test_different_eval_intervals_exclude_evaluation_and_logging_from_throughput(
-    monkeypatch, num_steps, make_optimizer_config,
+    monkeypatch, num_steps, make_optimizer_config, sgd_optimizer_factory,
 ):
     elapsed = [0.0]
 
@@ -104,7 +104,7 @@ def test_different_eval_intervals_exclude_evaluation_and_logging_from_throughput
         ),
         model=model,
         loss_fn=torch.nn.CrossEntropyLoss(),
-        optimizer_factory=torch.optim.SGD,
+        optimizer_factory=sgd_optimizer_factory,
         logger=logger,
         count_tokens=True,
     )
@@ -150,7 +150,7 @@ def test_different_eval_intervals_exclude_evaluation_and_logging_from_throughput
 
 
 @pytest.mark.parametrize("logging_steps", [None, 2], ids=["no-train-events", "no-logger"])
-def test_scheduled_evaluation_runs_independently_of_training_logging(logging_steps, make_optimizer_config):
+def test_scheduled_evaluation_runs_independently_of_training_logging(logging_steps, make_optimizer_config, sgd_optimizer_factory):
     with torch.random.fork_rng(devices=[]):
         model = torch.nn.Linear(1, 1, bias=False, device="cpu", dtype=torch.float32)
     with torch.no_grad():
@@ -162,7 +162,7 @@ def test_scheduled_evaluation_runs_independently_of_training_logging(logging_ste
         ),
         model=model,
         loss_fn=torch.nn.MSELoss(),
-        optimizer_factory=torch.optim.SGD,
+        optimizer_factory=sgd_optimizer_factory,
         logger=logger,
     )
     evaluated_weights = []

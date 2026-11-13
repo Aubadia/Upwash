@@ -2,6 +2,9 @@
 
 This document records the destination for the first training loop. Implementation progress and test evidence live in [the roadmap](../roadmap/README.md). Follow the responsibility boundaries in [Architecture.md](Architecture.md).
 
+The complete lab requirements and unresolved source ambiguities are recorded
+in [Spec.md](Spec.md). They extend beyond this initial Trainer milestone.
+
 ## Kernel Terminology and API Status
 
 In Upwash, kernels are operation implementations such as matmul, attention, and fused tensor operations. They are used at the operation layer within models or loss functions.

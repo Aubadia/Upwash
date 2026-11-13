@@ -2,6 +2,15 @@
 
 ## Status — 2026-11-13
 
+The full user-supplied lab description is now consolidated in
+[docs/Spec.md](../docs/Spec.md), separating source requirements, existing
+project choices, and unresolved ambiguities. It preserves the seven required
+metric names and documents evaluation/forecasting units needing clarification.
+Session baseline `./test.sh` → exit 0, `276 passed in 4.67s`.
+Only documentation changed; no new API or test was introduced. Next remains:
+agree on explicit LM perplexity opt-in and add its first numerical test.
+This passing suite does not establish remote delivery or full lab compliance.
+
 Merged `origin/main` (`fccd286`) into `feat/Trainer-Log`. Config resolution keeps
 the new required Muon/AdamW optimizer fields and data/model/schedule settings,
 alongside optional logging_steps/eval_steps. Builder preserves build_dataset

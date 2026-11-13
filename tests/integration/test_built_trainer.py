@@ -12,7 +12,7 @@ from upwash.core.logger import MemoryLogger
     ids=["lr-0.1", "lr-0.05"],
 )
 def test_built_trainer_updates_supplied_model_without_automatic_logging(
-    make_optimizer_config, lr, expected_weight
+    make_optimizer_config, sgd_optimizer_factory, lr, expected_weight
 ):
     with torch.random.fork_rng(devices=[]):
         model = torch.nn.Linear(1, 1, bias=False, device="cpu", dtype=torch.float32)
@@ -23,7 +23,7 @@ def test_built_trainer_updates_supplied_model_without_automatic_logging(
         config=TrainingConfig(optimizer=make_optimizer_config(lr=lr)),
         model=model,
         loss_fn=torch.nn.MSELoss(reduction="mean"),
-        optimizer_factory=torch.optim.SGD,
+        optimizer_factory=sgd_optimizer_factory,
         logger=logger,
     )
     inputs = torch.tensor([[1.0]], device="cpu", dtype=torch.float32)

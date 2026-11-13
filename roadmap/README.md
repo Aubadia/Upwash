@@ -2,7 +2,98 @@
 
 Last updated: 2026-11-13 (Asia/Taipei).
 
+Lab requirements are consolidated in [docs/Spec.md](../docs/Spec.md), including
+compute grants, exact token accounting, architecture, evaluation, forecasts,
+submission, and unresolved source inconsistencies. This documentation update
+adds no API or implementation. Session baseline: `./test.sh` → exit 0,
+`276 passed in 4.67s`. Current priority remains task 019: agree on explicit
+LM perplexity opt-in before writing its first test. External scoring units,
+grant counts, and the official final configuration remain clarification items
+before launching the affected runs.
+
 ## Resume Here
+
+Latest user-directed work: [022 — Muon and AdamW Factory](022-muon-adamw-factory.md).
+Builder integration is now Green. The factory/CombinedOptimizer pass the
+original group/config test. Added a real CPU tiny-LM two-batch training test
+using `partial(build_muon_adamw, model_config=model_config)` with the existing
+Builder; parameters and last-batch gradients match independent torch Muon and
+AdamW references. Bias and tied-embedding updates are covered. Targeted tests:
+`5 passed in 3.08s`; full `./test.sh --tb=short`: `280 passed in 3.42s`
+(exit 0). No production changes or new Red in this step. No current blocker.
+Next: agree on further behavior; direct HF output adaptation, optimizer edge
+cases, schedules/checkpoints and per-group LR logging remain pending.
+Earlier implementation and Red records below are historical.
+
+Approved `build_muon_adamw(model, *, config, model_config)` under
+`components/optimizers/muon_adamw.py`, using `ModelConfig.d_model` for decay
+scaling. Attention/MLP matrices go to Muon; embedding/head/norm/bias to AdamW;
+tied weights are assigned once. First test uses a real tiny tied HF Llama
+and real torch 2.15.0+cu132 reference optimizers, which construct successfully.
+Targeted factory/Builder/adaptor tests: `1 failed, 4 passed in 3.84s`;
+full `./test.sh --tb=short`: `1 failed, 278 passed in 3.55s` (both exit 1).
+Sole intended Red is the missing `upwash.components` module at the agreed
+factory import; Upwash group assertions have not executed. No environment
+blocker or production edits. Next: user implements factory/combined optimizer,
+then verify Green before update and gradient-clearing increments.
+
+Latest user-directed work: [021 — Model-Aware Optimizer Factory](021-optimizer-factory.md).
+Latest verification is Green: user implemented
+`optimizer_factory(model, config=config.optimizer)`. Real Muon factory test
+passes. Legacy SGD test callers now use a shared test-only adapter, retaining
+all numerical expectations. Targeted Builder/config/logging/evaluation tests:
+`72 passed in 2.37s`; full `./test.sh`: `278 passed in 3.30s` (both exit 0).
+No current blocker. This completes factory injection; next agree on the
+production Muon/AdamW factory and parameter grouping before writing its tests.
+The current Muon factory is test-local. Agent changed tests/docs only.
+Earlier failure records below are historical.
+
+Newest check: the single Muon factory test still fails because Builder passes
+`model.parameters()` rather than `model`. The `config=` keyword is fixed.
+Command: `./test.sh tests/unit/test_builder.py::test_build_trainer_passes_model_and_complete_config_to_muon_factory --tb=short`.
+Next: user passes the complete model; then migrate legacy SGD test callers and
+verify Green. No broader tests or production edits in this check.
+
+Latest implementation check: the targeted Builder/config command below now
+returns `5 failed, 43 passed in 1.55s` (exit 1). Builder passes
+`model.parameters(), lr=config.optimizer`: Muon factory rejects `lr`, while
+old SGD callers receive a config object as their numerical learning rate.
+Next: user changes the call to `optimizer_factory(model, config=config.optimizer)`;
+then adapt legacy SGD test callers. Full suite not rerun. The original Red
+result below is historical.
+
+Agreed contract: `optimizer_factory(model, *, config: OptimizerConfig)`;
+the user requested real Muon in the test. A standalone CPU Muon gradient
+update succeeds with torch 2.15.0+cu132. New Builder test is intended Red:
+`./test.sh tests/unit/test_builder.py tests/integration/test_built_trainer.py tests/unit/test_training_config.py`
+→ exit 1, `1 failed, 47 passed in 2.16s`. Builder still passes `lr=` instead
+of the complete config/model; factory assertions have not executed. No
+environment blocker or production changes. Next: user changes the Builder
+call; adapt old SGD test callers to the approved contract and verify Green.
+Combined Muon/AdamW parameter grouping and width-scaled decay remain later
+increments. Full suite not rerun.
+
+Latest user-directed work: [020 — HF Llama Adaptor](020-hf-llama-adaptor.md).
+Implemented the config adaptor and corrected
+the factory name to `build_llama_model`. Latest verification:
+`./test.sh tests/unit/test_adaptor.py tests/unit/test_model_config.py` → exit 0,
+`58 passed in 2.76s`. CPU construction and the 4,432-parameter count are Green;
+the full suite was not rerun. No current blocker. Next: agree on initialization,
+output scaling and detailed forward tests; custom initialization/output scaling
+remain unimplemented. The previous Red record below is historical.
+
+The user approved `build_llama_model(ModelConfig)` returning a CPU
+`LlamaForCausalLM`; `adaptor.py` is empty. The first test checks type, parameter
+devices and a hand-calculated 4,432-parameter tiny model. The user installed
+transformers, locked at 5.22.2 (torch 2.15.0). Real HF reference construction
+succeeded on CPU with exactly 4,432 parameters. Targeted adaptor/config command:
+`1 failed, 57 passed in 2.56s`; full `./test.sh`: `1 failed, 276 passed in 3.50s`.
+Sole failure is the missing `build_llama_model` import, the intended API Red;
+Upwash model assertions have not executed. The earlier dependency blocker is resolved.
+Baseline recheck: model config `57 passed`; full `./test.sh` → exit 0,
+`276 passed in 4.69s`. Next: user implements the configured CPU model factory,
+then verify Green. Initialization/output scaling need later tests. Logging work below
+remains pending separately.
 
 Current priority: [019 — Training Loop Logging](019-training-loop-logging.md).
 Merge verification: integrated `origin/main` at `fccd286` into
