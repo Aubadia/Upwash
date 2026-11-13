@@ -20,4 +20,5 @@ def build_trainer(
         logging_steps=config.logging_steps,
         count_tokens=count_tokens,
         pad_token_id=pad_token_id,
+        eval_steps=config.eval_steps,
     )

@@ -2,6 +2,75 @@
 
 ## Status — 2026-11-13
 
+Scheduled evaluation is implemented. Config defaults `eval_steps` to `None`;
+Builder forwards it to Trainer. `train(..., eval_batches=...)` evaluates at
+the configured interval and at normal completion without repeating a final
+checkpoint. Scheduling is active when both interval and dev iterable are
+supplied, independently of logger presence or training-log settings.
+
+Events retain a step's metrics until the next batch is fetched or the loop
+finishes, allowing final evaluation to merge with a complete training-log
+interval at that step. This also merges coincident interval events and supports
+eval-only events. Per-interval throughput subtracts evaluation/logging delays
+while retaining data loading; final-partial timing still uses the last update.
+Perplexity remains absent for arbitrary losses.
+
+- Original scheduled-eval/logging command after implementation → exit 0,
+  `20 passed in 1.67s`; both earlier missing-API cases are Green.
+- `./test.sh tests/integration/test_scheduled_evaluation.py tests/integration/test_training_logging.py tests/unit/core/test_trainer_evaluation.py`
+  → exit 0, `30 passed in 1.60s`.
+- Full `./test.sh` → exit 0, `123 passed in 1.43s`.
+
+Four additional cases cover logging/evaluation intervals 3/2 with 3 or 4
+updates, eval-only events, and no logger. Fixed-clock cases include 100-second
+evaluation forwards, 50-second logs, and 20-second iterator-exhaustion work;
+training throughput remains 0.8 tokens/s. Real autograd/SGD is retained.
+Those extra cases passed on first execution; no artificial Red is claimed.
+
+Next: agree on explicit LM perplexity opt-in and its first known-loss test.
+Interval validation, one-shot dev iterators, scheduled-evaluation exceptions,
+real dev data, GPU/distributed execution, and remote delivery remain outside
+the verified scope. No dependencies or test configuration changed.
+Earlier records below are historical.
+
+Automatic evaluation API is agreed. First increment: `TrainingConfig(eval_steps=None)`
+wired through Builder to Trainer, and `train(batches, *, eval_batches=None)`
+accepting a reusable dev iterable (for example, a DataLoader or list). Evaluate
+after each N completed updates and at normal completion without duplicating a
+final evaluation already performed at that step. Log `eval/loss`; merge with
+training metrics when events coincide. Exclude evaluation from throughput.
+Omission preserves existing behavior. Initial evaluation retains the dense,
+unpadded, mean-reduced loss contract of `evaluate()`.
+
+Perplexity remains a separate next increment with explicit opt-in for
+natural-log next-token cross-entropy, rather than inferring LM semantics from
+token counting or applying `exp` to arbitrary loss functions. One-shot dev
+iterators, schedule validation, missing-input behavior, and actual dev data
+will need their own decisions/cases.
+Baseline recheck: `./test.sh` → exit 0, `117 passed in 2.26s`.
+
+Added `tests/integration/test_scheduled_evaluation.py` with exact-interval
+(2 updates) and final-partial (3 updates) cases at logging/evaluation interval
+2. Real SGD yields weights 0.72/0.976. The reusable dev list has two targets
+equal to 1 and one equal to 3; post-update weighted mean MSE is
+`[2*(w-1)^2 + (w-3)^2] / 3`, giving losses 1.7850666667/1.3659093333.
+Expected records at steps [2] or [2, 3] include both train/loss and eval/loss.
+Assertions also cover unchanged training gradients, restored train mode,
+no-grad evaluation, no duplicate evaluation at an exact final boundary,
+and absence of perplexity for MSE.
+
+- `./test.sh tests/integration/test_scheduled_evaluation.py tests/integration/test_training_logging.py`
+  → exit 1, `2 failed, 18 passed in 1.73s`.
+- `./test.sh` → exit 1, `2 failed, 117 passed in 1.51s`.
+
+Intended Red: `TrainingConfig` rejects `eval_steps`. Construction stops before
+training/evaluation assertions; these outcomes do not establish runtime
+scheduling or metric correctness yet. Only tests/docs changed.
+Next: add optional eval_steps to config/Trainer, wire Builder, and implement
+train's optional eval_batches plus scheduled/final evaluation with merged
+events. Then verify Green. Differing intervals, evaluation-time exclusion from
+throughput, disabled evaluation, and failure handling need subsequent cases.
+
 Throughput is implemented in Trainer's interval and final-partial events.
 `time.perf_counter()` timing is enabled only with token counting and logging.
 Each interval accumulates its own token count; tokens/time reset after metric

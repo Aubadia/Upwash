@@ -78,8 +78,28 @@ must be a mean over target elements, and evaluation weights each batch by
 on success or a loss exception, rejects empty input, and preserves existing
 gradients, parameters, optimizer state, and training progress. These behaviors
 and real tiny-LM training/evaluation are verified Green on 2026-11-13. Real dev
-subset preparation, automatic scheduling/logging, and final Flock scoring remain
+subset preparation and final Flock scoring remain
 pending. This extension does not change the original training milestone above.
+
+## Scheduled Evaluation
+
+`TrainingConfig(eval_steps=N)` wires the interval through Builder to Trainer.
+`trainer.train(batches, eval_batches=dev_loader)` evaluates after every N
+completed updates and once at normal completion unless that step was already
+evaluated. The dev iterable must support repeated traversal; initially use
+dense, unpadded targets with a mean-reduced supplied loss, as in `evaluate()`.
+Scheduling is inactive when the interval or dev iterable is omitted.
+
+Evaluation runs independently of training logging and still runs without a
+logger. With a logger it emits `eval/loss`, combining coincident training and
+evaluation metrics in one event, including the final step. A step's metrics
+are retained until the next batch is fetched or training finishes, allowing
+final evaluation to join an event at an exact training-log boundary.
+Evaluation and logging time are excluded from training throughput, including
+when the logging and evaluation intervals differ. Evaluation preserves model
+mode and training gradients through the existing evaluator. Steps remain
+per-call; this increment does not add perplexity, validate interval values,
+or make a one-shot dev iterator reusable.
 
 ## Token Counting Extension
 

@@ -5,6 +5,32 @@ Last updated: 2026-11-13 (Asia/Taipei).
 ## Resume Here
 
 Current priority: [019 — Training Loop Logging](019-training-loop-logging.md).
+Automatic `eval/loss` is implemented: config/Builder/Trainer wire `eval_steps`,
+and `train(..., eval_batches=...)` runs interval/final evaluations with no
+duplicate final checkpoint. Coincident and final train/eval metrics share an
+event; eval-only and no-logger runs are supported. Differing schedules exclude
+evaluation/logging time from throughput. Existing defaults remain optional.
+Targeted scheduled-eval/logging/manual-eval command → exit 0,
+`30 passed in 1.60s`; full `./test.sh` → exit 0, `123 passed in 1.43s`.
+Next: agree on explicit LM perplexity opt-in and add its first numerical test.
+Interval validation, reusable-dev enforcement, real dev data, GPU/distributed
+behavior, and remote delivery remain unverified. See 019 for detailed evidence.
+Earlier records below are historical.
+
+Automatic `eval/loss` API is agreed: config `eval_steps=None`
+passes through Builder to Trainer; `train(..., eval_batches=dev_loader)` uses
+a reusable dev iterable every N updates and at completion, with no duplicate
+final evaluation. Coincident train/eval metrics share an event, and evaluation
+is excluded from throughput. Perplexity follows with explicit LM opt-in.
+Added two real-SGD integration cases for exact/final-partial evaluation at
+interval 2. Expected post-update weighted dev MSE: 1.7850666667/1.3659093333;
+train/eval metrics share events at steps [2] or [2, 3], without duplicate eval.
+Targeted scheduled-eval/logging command → `2 failed, 18 passed in 1.73s`;
+full `./test.sh` → `2 failed, 117 passed in 1.51s` (both exit 1).
+Intended Red: Config rejects eval_steps, before runtime assertions execute.
+Only tests/docs changed. Next: wire config/Builder/Trainer and add scheduled
+and final evaluation, then verify Green. Details and remaining cases are in 019.
+
 Throughput is implemented in both event paths. Interval tokens/time reset
 after logging and at the start of each training call; final-partial timing
 uses the last update's timestamp. Deterministic CPU cases verify padding,
