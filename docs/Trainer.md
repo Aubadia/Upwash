@@ -81,6 +81,22 @@ and real tiny-LM training/evaluation are verified Green on 2026-11-13. Real dev
 subset preparation, automatic scheduling/logging, and final Flock scoring remain
 pending. This extension does not change the original training milestone above.
 
+## Token Counting Extension
+
+Trainer and `build_trainer` accept optional `count_tokens=False` and
+`pad_token_id=None`. With `count_tokens=True`, completed training updates add
+the number of input elements, excluding values equal to a configured padding
+id. Without a padding id, zero is a valid token. Targets are not counted.
+
+The total persists across `train()` calls on the same Trainer, including calls
+without a logger, and excludes `evaluate()`. Enabled interval and final-partial
+events include `train/total_tokens_seen` as a Python integer. Omitted or false
+`count_tokens` preserves generic training without token metrics. Padding
+exclusion changes this metric only; the supplied loss controls loss masking.
+Log steps retain their existing per-call semantics. These CPU behaviors are
+verified; throughput timing, GPU/distributed counting, and checkpoint
+persistence of the counter are not established.
+
 ## References
 
 - [PyTorch: Optimizing Model Parameters](https://docs.pytorch.org/tutorials/beginner/basics/optimization_tutorial.html): the basic loss, backward, gradient clearing, and optimizer update flow.

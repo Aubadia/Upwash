@@ -2,6 +2,97 @@
 
 ## Status — 2026-11-13
 
+Token counting is implemented and verified Green. Builder forwards
+`count_tokens=False` and `pad_token_id=None` to Trainer. When enabled, the
+counter adds `inputs.numel()` without padding, or a vectorized non-padding
+count with a configured padding id. It increments after successful optimizer
+updates, persists across training calls, and is unaffected by evaluation.
+Counting also continues when metric emission is disabled. Both interval and
+final-partial logs include integer `train/total_tokens_seen`; disabled counting
+omits the key. Padding counts remain scalar tensors until event emission,
+avoiding per-update conversion to Python integers.
+
+The token test now covers no padding, padding ids 0 and 1, all-padding inputs,
+and explicit disabled counting. A direct-Trainer case verifies repeated calls,
+evaluation exclusion, and a training call with no logger. Existing generic
+regression tests assert token metrics remain absent by default. All scenarios
+use real autograd and SGD updates. Padding exclusion applies to the metric;
+the supplied loss function still controls loss masking.
+
+- Before implementation, `./test.sh tests/integration/test_training_logging.py`
+  → exit 1, `6 failed, 8 passed in 1.84s`. All six failures were missing
+  `count_tokens` arguments on Builder or Trainer.
+- After implementation, the same command → exit 0,
+  `14 passed in 1.40s`.
+- Full `./test.sh` → exit 0, `113 passed in 1.50s`.
+
+Next: agree on throughput timing boundaries, then add a deterministic-clock
+test. Throughput, scheduled evaluation, GPU/multi-device behavior, and remote
+delivery remain unverified. Dependencies/configuration were unchanged.
+Earlier records below are historical.
+
+The simpler token-count interface counts each non-padding token:
+`count_tokens=False` and `pad_token_id=None` on Trainer
+and Builder, with explicit `count_tokens=True` enabling token metrics. The
+earlier callback proposal is superseded. For the initial unpadded LM scope,
+count `inputs.numel()`; a configured padding id excludes matching input ids.
+Omission preserves generic training without token metrics. Lifetime cumulative
+counting and evaluation exclusion remain planned follow-up cases.
+
+Baseline `./test.sh` → exit 0, `107 passed in 2.12s`. Added
+`test_built_trainer_logs_total_input_tokens_including_final_partial_interval`.
+It supplies three CPU int64 LM batches with 8/8/4 input tokens, real Embedding
+logits, cross-entropy, SGD, and logging interval 2. Expected events at steps
+2/3 contain integer `train/total_tokens_seen` values 16/20 alongside loss.
+Token id zero is valid with `pad_token_id=None`; targets must not double the
+count. Assertions also require actual parameter updates.
+
+- `./test.sh tests/integration/test_training_logging.py` → exit 1,
+  `1 failed, 8 passed in 0.99s`.
+- `./test.sh` → exit 1, `1 failed, 107 passed in 1.32s`.
+
+Intended missing-API Red: `build_trainer()` rejects keyword `count_tokens`.
+Training, numerical updates, and payload assertions have not executed in the
+new case. Existing cases remain Green; this is not an environment failure.
+Only tests/docs changed at that stage. Historical next action: add the optional
+settings to Builder and Trainer, wire them through, and emit the cumulative count in both logging
+paths; then verify Green. Padding exclusion, successive calls, evaluation
+exclusion, disabled counting, and throughput timing need subsequent tests.
+
+The one-update global L2 test now covers an additional unused trainable
+parameter and an additional frozen parameter, as well as the original model.
+The extra parameter is registered before Builder constructs real SGD. In each
+new case its value remains `100` and its gradient remains `None`, while the
+active weights/bias receive their expected updates and unchanged gradients.
+The logged Python-float norm remains `sqrt(104)`. This verifies exclusion of
+parameters without gradients without weakening the original numerical case.
+
+- `./test.sh tests/integration/test_training_logging.py` → exit 0,
+  `8 passed in 1.46s`.
+- `./test.sh` → exit 0, `107 passed in 1.39s`.
+
+Both new cases passed on first run; no artificial Red. Only tests/docs changed.
+Next: agree on explicit LM token counting and interval timing before writing
+token-count/throughput tests. No new API is agreed. All-absent gradients,
+clipping/AMP, and multi-device behavior remain unverified. Earlier records follow.
+
+Extended the existing exact/partial/two-interval integration cases with
+last-update norm assertions. With `x=1`, target 2, zero initial weight, mean
+MSE, and SGD LR 0.1, pre-update gradients are `-4`, `-3.2`, `-2.56`, and
+`-2.048`. Events at steps 2/3/4 must therefore carry `3.2`/`2.56`/`2.048`,
+respectively. This distinguishes last-step sampling from interval averaging,
+stale values, and gradients recomputed after the update. Final weights and
+unchanged last gradients are also checked. No production changes were made.
+
+- `./test.sh tests/integration/test_training_logging.py` → exit 0,
+  `6 passed in 1.55s`.
+- `./test.sh` → exit 0, `105 passed in 1.37s`.
+
+All new assertions passed on first execution; no artificial Red. Next: cover
+parameters without gradients. Token-count/throughput policy still requires
+agreement before new metric tests. Clipping/AMP and multi-device behavior remain
+unverified. Earlier records follow.
+
 Trainer now computes global L2 across detached parameter gradients after backward and before the optimizer
 update, excluding parameters without gradients and preserving gradient values.
 Both regular and final-partial events emit `train/grad_norm` for the last
