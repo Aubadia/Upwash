@@ -23,7 +23,20 @@ before launching the affected runs.
 
 ## Resume Here
 
-Current task (2026-11-13): [021 — Eval perplexity](021-eval-perplexity.md), on branch `feat/eval-perplexity` (PR #11).
+Current task (2026-11-14): [024 — Option-B initialization for the HF Llama](024-llama-initialization.md), on branch `feat/llama-init` from `main` at `be696b0` (PR #11 merged).
+
+- Agreed (option C):
+  - `output_multiplier(config) = (output_std_coeff / d_model) / embedding_std`.
+  - `build_llama_model` initializes the embedding with std `embedding_std`, and the hidden `nn.Linear` weights inside `model.model.layers` with std `in_features ** -0.5`. Norms stay ones, and `lm_head` stays tied.
+  - It registers a forward hook on `lm_head` that multiplies logits by α. The model type, `causal_lm_loss`, and entry-script calls are unchanged.
+- Red: `14 failed, 3 passed`, and the rest of the suite gives `324 passed`. A scratch reference implementation passed `341 passed`.
+- Green: the user implemented it, and the full suite returned `341 passed`.
+- Next:
+  - Commit and open a PR.
+  - `export_hf_model` (a fresh model, α folded into the final norm) is deferred until Flock scoring.
+  - `max_position_embeddings` waits for the host's answer on 8192.
+
+Previous task (2026-11-13): [021 — Eval perplexity](021-eval-perplexity.md), on branch `feat/eval-perplexity`. Merged through PR #11.
 
 - Agreed interface: `Trainer(..., eval_perplexity=False)` and `build_trainer(..., eval_perplexity=False)`.
   - When enabled, every event carrying `eval/loss` also carries `eval/perplexity = exp(eval/loss)`.
