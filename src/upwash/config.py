@@ -1,8 +1,9 @@
 import math
 
 class TrainingConfig:
-    def __init__(self, optimizer: OptimizerConfig) -> None:
+    def __init__(self, optimizer: OptimizerConfig, logging_steps=None) -> None:
         self.optimizer = optimizer
+        self.logging_steps = logging_steps
 
 class OptimizerConfig:
     def __init__(self, lr) -> None:

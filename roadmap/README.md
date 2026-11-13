@@ -4,7 +4,81 @@ Last updated: 2026-11-13 (Asia/Taipei).
 
 ## Resume Here
 
-Current direction: resume [017 — Self-Written Evaluation](017-small-evaluation.md).
+Current priority: [019 — Training Loop Logging](019-training-loop-logging.md).
+Latest increment: added the one-update global L2 `train/grad_norm` test using
+real SGD, two weights, and a bias. Expected `sqrt(104)` from gradients
+`[-6, -8, -2]`; update/gradient/loss/LR assertions pass, then the metric lookup
+raises `KeyError: 'train/grad_norm'`. Baseline: `104 passed in 1.80s`.
+Targeted logging tests: `1 failed, 5 passed in 1.14s`; full `./test.sh`:
+`1 failed, 104 passed in 1.39s`. Only tests/docs changed.
+Next: user logs the global L2 norm without mutating gradients, then verify Green.
+Multi-step norm sampling, actual clipping timing, and final-partial norm logging
+are not established by this one-update case. Earlier records are historical.
+
+Latest: at the user's explicit implementation request, Trainer now captures
+single-group LR before optimizer updates and logs `train/learning_rate` beside
+loss in both interval and final-partial events. Targeted logging test:
+`5 passed in 1.66s`; full `./test.sh`: `104 passed in 1.66s`.
+Loss and single-group constant-LR logging are Green. Next: agree on gradient
+norm sampling (proposed global L2 before clipping on the last completed update),
+then add its smallest test. Multi-group LR naming, token/throughput policies,
+automatic evaluation inputs/schedule, and remote delivery remain pending.
+This implementation increment changed Trainer/docs; earlier results follow.
+
+The user requested coverage of the screenshot's seven metrics. The next small
+increment is single-group `train/learning_rate` in the existing loss events,
+including the final partial interval. Baseline: `102 passed in 1.88s`.
+New real-SGD cases (LR 0.1/0.05) confirm updates and steps 2/3, then fail with
+`KeyError: 'train/learning_rate'`. Targeted logging test: `2 failed, 3 passed
+in 1.46s`; full `./test.sh`: `2 failed, 102 passed in 1.68s`.
+Only tests/docs changed. Next: user adds LR to both event paths, then verify
+Green. Gradient norm, multi-group keys, token/throughput policy, and automatic
+eval inputs/schedule still require agreement before tests. Loss logging is
+Green; this does not establish logging of the other metrics or remote delivery.
+Earlier status/next-action entries below are historical.
+
+Current files default both Config and Trainer intervals to `None`; baseline
+`./test.sh` is Green: `100 passed in 1.91s`. Added exact-interval cases (2 and
+4 updates at interval 2) alongside the existing partial-interval case. All pass
+on first execution: logging/Builder/config regression command →
+`13 passed in 1.48s`. No artificial Red; the full suite was not rerun after
+these test-only changes. Only tests/docs changed in this increment.
+Next: verify training with an explicit interval and no logger, then agree on
+interval validation. Earlier failures and next-action entries below are historical.
+
+Latest full suite after the user set the config default to `10`:
+`./test.sh` → `2 failed, 98 passed in 1.99s`. Both built-Trainer cases expect
+disabled logging when omitted, but the default enables the final partial flush.
+Next: default the interval to `None` in config and Trainer, then rerun the suite.
+This diagnostic follow-up changed only documentation; earlier results follow.
+
+Follow-up full suite: `./test.sh` → `5 failed, 95 passed in 1.86s`.
+All five fail because existing callers omit the newly required
+`TrainingConfig.logging_steps`; interval logging passes. Next: user defaults
+the config interval to `None`, aligns Trainer's default for direct callers, and
+reruns the suite. This follow-up changed only documentation.
+
+Latest check: at the user's explicit implementation request, Trainer now emits
+interval mean loss and flushes the final partial interval. Logging plus Trainer
+loss/empty/evaluation tests pass: `12 passed in 1.54s`; full suite not run.
+Config and Builder wiring now reach the loop. Existing defaults still need to
+restore agreed omitted-setting compatibility (TrainingConfig requires the
+interval; Trainer defaults to 10). Next: resolve those defaults and cover exact
+interval completion/disabled logging. The initial Red recorded below is historical.
+
+On branch `feat/Trainer-Log`, HEAD `6476e04` (minimum evaluation committed), the
+user selected `logging_steps` on `TrainingConfig`, wired through Builder. First
+behavior: emit the mean of step losses every N completed optimizer updates and
+flush the final partial interval; omitted setting preserves disabled automatic
+logging. First integration test is Red: `TrainingConfig` rejects `logging_steps`.
+Latest `./test.sh` on 2026-11-13 → `1 failed, 99 passed in 1.83s`; baseline before
+the test was `99 passed in 2.07s`. Next: user adds/configures the interval and
+implements loop emission, then verify Green. Further metrics, cumulative remote
+steps, token-count policy, and scheduled eval are planned in 019, not yet tested.
+The agent changed only tests/docs. The self-written eval follow-up below is
+deferred while working on train-loop logging.
+
+Previous direction (deferred): [017 — Self-Written Evaluation](017-small-evaluation.md).
 On 2026-11-13 the user stopped [018's Flock evaluation integration](018-flock-final-evaluation.md)
 and requested a self-written evaluator. Reuse `Trainer.evaluate`; the scope
 question is pending: FineWeb-Edu dev loss/PPL first, or all three benchmark

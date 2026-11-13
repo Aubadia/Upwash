@@ -3,12 +3,20 @@ import torch
 from upwash.core.state import TrainingState
 
 class Trainer:
-    def __init__(self, model: torch.nn.Module, loss_fn, optimizer, logger=None):
+    def __init__(
+            self, 
+            model: torch.nn.Module, 
+            loss_fn, 
+            optimizer, 
+            logger=None,
+            logging_steps=None,
+        ):
         self.state = TrainingState()
         self.model = model
         self.loss_fn = loss_fn
         self.optimizer = optimizer
         self.logger = logger
+        self.logging_steps=logging_steps
 
     def compute_loss(
             self, 
@@ -23,20 +31,47 @@ class Trainer:
        
         self.state.set_state("global_step", 0)
         steps = 0
+        logging_enabled = self.logger is not None and self.logging_steps is not None
+        interval_loss = 0.0
+        interval_steps = 0
         
         for input, target in batches:
             self.optimizer.zero_grad()
             loss = self.compute_loss(input, target)
             loss.backward()
+            if logging_enabled:
+                learning_rate = float(self.optimizer.param_groups[0]["lr"])
             self.optimizer.step()
             steps = steps + 1
+
+            if logging_enabled:
+                interval_loss += loss.detach()
+                interval_steps += 1
+                if interval_steps == self.logging_steps:
+                    self.logger.log(
+                        {
+                            "train/loss": interval_loss.item() / interval_steps,
+                            "train/learning_rate": learning_rate,
+                        },
+                        step=steps,
+                    )
+                    interval_loss = 0.0
+                    interval_steps = 0
 
         if steps == 0:
             raise ValueError("batches cannot be empty")
         
         self.state.set_state("global_step", steps) 
-        
-        # logger.log() when needed
+
+        # Log additional information for the last step
+        if logging_enabled and interval_steps:
+            self.logger.log(
+                {
+                    "train/loss": interval_loss.item() / interval_steps,
+                    "train/learning_rate": learning_rate,
+                },
+                step=steps,
+            )
 
         return self.state
 
