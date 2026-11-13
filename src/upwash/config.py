@@ -132,3 +132,31 @@ class TrainingConfig:
         self.logging_steps = logging_steps
         self.eval_steps = eval_steps
         self.precision = precision
+
+
+@dataclass
+class LoggingConfig:
+    project: str
+    name: str
+
+
+@dataclass
+class RunConfig:
+    model: ModelConfig
+    train_data: DataConfig
+    training: TrainingConfig
+    schedule: ScheduleConfig
+    batch_size: int
+    eval_data: DataConfig | None = None
+    eval_batch_size: int = 1
+    device: str = "cpu"
+    seed: int = 0
+    logging: LoggingConfig | None = None
+
+    def __post_init__(self):
+        for name in ("batch_size", "eval_batch_size"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{name} must be a positive integer, got {value}")
+        if self.train_data.num_tokens % self.train_data.seq_len:
+            raise ValueError("train_data.num_tokens must be divisible by seq_len")
