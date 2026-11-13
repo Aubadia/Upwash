@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from upwash.builder import build_trainer
-from upwash.config import OptimizerConfig, TrainingConfig
+from upwash.config import TrainingConfig
 from upwash.core.logger import MemoryLogger
 
 
@@ -17,7 +17,7 @@ from upwash.core.logger import MemoryLogger
     ids=["exact-interval", "final-partial-interval"],
 )
 def test_scheduled_evaluation_merges_loss_with_training_events_without_duplicates(
-    num_steps, expected_steps, expected_train_losses, expected_eval_losses,
+    num_steps, expected_steps, expected_train_losses, expected_eval_losses, make_optimizer_config,
 ):
     with torch.random.fork_rng(devices=[]):
         model = torch.nn.Linear(1, 1, bias=False, device="cpu", dtype=torch.float32)
@@ -26,7 +26,7 @@ def test_scheduled_evaluation_merges_loss_with_training_events_without_duplicate
     logger = MemoryLogger()
     trainer = build_trainer(
         config=TrainingConfig(
-            optimizer=OptimizerConfig(lr=0.1), logging_steps=2, eval_steps=2,
+            optimizer=make_optimizer_config(lr=0.1), logging_steps=2, eval_steps=2,
         ),
         model=model,
         loss_fn=torch.nn.MSELoss(reduction="mean"),
@@ -81,7 +81,7 @@ def test_scheduled_evaluation_merges_loss_with_training_events_without_duplicate
 
 @pytest.mark.parametrize("num_steps", [3, 4], ids=["final-log-boundary", "final-eval-boundary"])
 def test_different_eval_intervals_exclude_evaluation_and_logging_from_throughput(
-    monkeypatch, num_steps,
+    monkeypatch, num_steps, make_optimizer_config,
 ):
     elapsed = [0.0]
 
@@ -100,7 +100,7 @@ def test_different_eval_intervals_exclude_evaluation_and_logging_from_throughput
     logger = SlowLogger()
     trainer = build_trainer(
         config=TrainingConfig(
-            optimizer=OptimizerConfig(lr=0.1), logging_steps=3, eval_steps=2,
+            optimizer=make_optimizer_config(lr=0.1), logging_steps=3, eval_steps=2,
         ),
         model=model,
         loss_fn=torch.nn.CrossEntropyLoss(),
@@ -150,7 +150,7 @@ def test_different_eval_intervals_exclude_evaluation_and_logging_from_throughput
 
 
 @pytest.mark.parametrize("logging_steps", [None, 2], ids=["no-train-events", "no-logger"])
-def test_scheduled_evaluation_runs_independently_of_training_logging(logging_steps):
+def test_scheduled_evaluation_runs_independently_of_training_logging(logging_steps, make_optimizer_config):
     with torch.random.fork_rng(devices=[]):
         model = torch.nn.Linear(1, 1, bias=False, device="cpu", dtype=torch.float32)
     with torch.no_grad():
@@ -158,7 +158,7 @@ def test_scheduled_evaluation_runs_independently_of_training_logging(logging_ste
     logger = MemoryLogger() if logging_steps is None else None
     trainer = build_trainer(
         config=TrainingConfig(
-            optimizer=OptimizerConfig(lr=0.1), logging_steps=logging_steps, eval_steps=2,
+            optimizer=make_optimizer_config(lr=0.1), logging_steps=logging_steps, eval_steps=2,
         ),
         model=model,
         loss_fn=torch.nn.MSELoss(),

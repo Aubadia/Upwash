@@ -5,6 +5,14 @@ Last updated: 2026-11-13 (Asia/Taipei).
 ## Resume Here
 
 Current priority: [019 — Training Loop Logging](019-training-loop-logging.md).
+Merge verification: integrated `origin/main` at `fccd286` into
+`feat/Trainer-Log`. Resolved config/Builder conflicts by retaining the required
+Muon/AdamW fields, data/model/schedule configs and dataset builder, plus Trainer
+logging/token/evaluation wiring. The generic optimizer factory receives only
+`lr`; logging/evaluation tests use the full optimizer-config fixture.
+`./test.sh` → exit 0, `276 passed in 2.21s`. Trainer's refactor is unchanged.
+Next: explicit LM perplexity opt-in as described in the logging task.
+
 Automatic `eval/loss` is implemented: config/Builder/Trainer wire `eval_steps`,
 and `train(..., eval_batches=...)` runs interval/final evaluations with no
 duplicate final checkpoint. Coincident and final train/eval metrics share an
@@ -228,7 +236,13 @@ Read [Architecture.md](../docs/Architecture.md), [Trainer.md](../docs/Trainer.md
 
 ## Current Position
 
-As of 2026-11-12, PRs #1–#5 are merged. `main` is at `1fca7a3` (PR #5, FlockLogger).
+As of 2026-11-12, PRs #1–#6 are merged. `main` is at `1d2dc74` (PR #6: tasks 015 and 016).
+
+Configuration area, current task: [017 — Optimizer and schedule configuration for the sweep](017-optimizer-schedule-config.md), on branch `feat/optimizer-schedule-config`. Agreed interface: `OptimizerConfig(lr, muon_beta, adam_beta1, adam_beta2, adam_lr_multiplier, weight_decay)` and `ScheduleConfig(warmup_ratio, decay_ratio, decay_shape, decay_power)`. Every field is required. The builder passes only `lr` to the optimizer factory, and building Muon plus AdamW is task 020. Red verified on 2026-11-12: `47 failed` for unexpected new fields and `ImportError` for `ScheduleConfig`. The user implemented both as dataclasses, plus the builder change. Green was reached the same day: `78 passed` for the task, full suite `160 passed`. Committed as `7a8ed2c`.
+
+Next configuration task, in the same pull request: [018 — Data configuration and `build_dataset`](018-data-config.md). Agreed interface: `DataConfig(root, pattern, format, seq_len, num_tokens)` and `build_dataset(config)` in `builder.py`. Red verified on 2026-11-13: `ImportError` for both names, while the rest of the suite gives `160 passed`. The user implemented both, and Green was reached the same day: `28 passed`, full suite `188 passed`. A real Flock folder builds 7,324 samples for a 30M-token budget. Committed as `2659838`.
+
+Third configuration task, in the same pull request: [019 — Model configuration](019-model-config.md). Agreed interface: `ModelConfig(vocab_size, n_layers, d_model, d_ff, n_heads, n_kv_heads, max_seq_len, rope_theta, norm_eps, embedding_std, output_std_coeff)` with `head_dim` and `num_parameters()`. Tied embeddings use option B (embedding std 0.1, output multiplier `α = (coeff/d)/embedding_std`). `num_parameters()` is tested against all five spec reference rows. The 150M row's 36 KV heads is a typo for 3. Red verified on 2026-11-13: `ImportError`, while the rest of the suite gives `188 passed`. The user implemented it, and Green was reached the same day: `57 passed`, full suite `245 passed`. Next: commit, then open the pull request for 017–019. Task 020 builds Muon plus AdamW, and `TrainingConfig` with the experiment config follows in a later pull request. A teammate is working on logging inside the training loop.
 
 Configuration (010), MemoryLogger (011), Builder (012), and the three FlockLogger unit cases are now verified Green. The user added deep-copying before SDK forwarding; all 65 tests pass. Task 013 remains incomplete because actual Flock delivery has not been exercised: current tests substitute RecordingRun for the SDK run.
 
@@ -242,9 +256,7 @@ The earlier `FlockLogger(run=run)` constructor is superseded. Unit tests replace
 
 The required Flock scenario logs these seven metrics: `train/loss`, `train/grad_norm`, `train/learning_rate`, `train/tokens_per_second`, `train/total_tokens_seen`, `eval/loss`, and `eval/perplexity`. Their definitions and known-value payload are recorded in [013](013-flock-logger.md). Unit tests verify forwarding of supplied values; their numerical calculation remains with training/evaluation code. No automatic Trainer metric emission or logger key filtering is added. Parameter-group LR naming remains to be agreed for a future multi-group case.
 
-Data area, current task: [015 — Read many shards as one dataset, with a sample budget](015-multi-shard-dataset.md), on branch `feat/multi-shard-dataset`. Agreed interface: `ConcatDataset(datasets)` and `Truncate(dataset, num_samples)`. Red verified on 2026-11-12: `ImportError` for both names. The user implemented both classes, and Green was reached the same day: `21 passed` for the task, full suite `83 passed`. A read-only check on the real shard gives the expected lengths and `(8, 4096)` batches. Committed as `41f8bca`.
-
-Next data task, in the same pull request: [016 — Read Flock's pre-tokenized `.npy` shards](016-npy-token-shard.md). Agreed interface: `PackedTokenDataset.from_npy(path, seq_len)`. Red verified on 2026-11-12: six new cases failed with `AttributeError` (no `from_npy`). The user implemented it, and Green was reached the same day: `21 passed` in the file, full suite `89 passed`. A read-only check on a real Flock `tokens.npy` confirms memory-mapping, `len` 15,395, and `(8, 4096)` batches. Still open: verifying the Flock data's dev-set exclusion. Committed as `65f0833`. Both commits are pushed on `feat/multi-shard-dataset`, and `main` (with PR #5) was merged into the branch on 2026-11-12; the only conflict was this README. Next: open the pull request for 015 and 016, then seeded shuffle.
+Data area: tasks [015](015-multi-shard-dataset.md) (`ConcatDataset`, `Truncate`) and [016](016-npy-token-shard.md) (`PackedTokenDataset.from_npy` for Flock `.npy` shards) merged through PR #6. Still open for Flock data: verifying dev-set exclusion. Next for data: seeded shuffle, per-rank sharding, and resume (a sampler), then the data settings in task 018.
 
 ## Current Verification — 2026-11-12
 
@@ -354,6 +366,9 @@ Tasks 001–008 keep their numbers, and 009 is the packed-token dataset. Configu
 | [012](012-build-trainer.md) | Build configured optimizer and Trainer with optional logger storage. | Two unit cases and two real-SGD integration cases; full suite `46 passed`. | Green; no automatic metric emission. |
 | [015](015-multi-shard-dataset.md) | Read many shards as one dataset and keep the first `num_samples` samples. | Ordered index mapping, empty parts skipped, negative and out-of-range indices, no crossing between real shards, budget checks. | Green: `21 passed`, full suite `83 passed`. |
 | [016](016-npy-token-shard.md) | Read Flock's `int32` `.npy` shards with `PackedTokenDataset.from_npy`. | Same samples as `.bin`, `int64` with large ids, `seq_len` and index checks, two `.npy` shards in `ConcatDataset`; real Flock file memory-mapped. | Green: `21 passed` in the 009 file, full suite `89 passed`. |
+| [017](017-optimizer-schedule-config.md) | Required Muon/AdamW optimizer fields and a WSD schedule config with validation; builder passes only `lr`. | Every field exposed and required, range and NaN/infinity checks, ratio sum, decay shapes, `to_dict`; builder tests with full configs. | Green: `78 passed`, full suite `160 passed`. |
+| [018](018-data-config.md) | `DataConfig(root, pattern, format, seq_len, num_tokens)` and `build_dataset` (sorted glob → shards → `ConcatDataset` → `Truncate`). | Required fields, format and budget checks, sorted `.npy`/`.bin` reading, `offsets.npy` ignored, budget truncation and over-budget/no-match errors, `DataLoader` batches. | Green: `28 passed`, full suite `188 passed`. |
+| [019](019-model-config.md) | `ModelConfig` for Llama-3.2-style models with tied-embedding init settings, `head_dim`, and `num_parameters()`. | Parameter counts equal all five spec reference rows (150M with 3 KV heads), required fields, positive sizes, head divisibility, even head dim, finite positive scalars, `to_dict`. | Green: `57 passed`, full suite `245 passed`. |
 
 Detailed implementation iterations, test commands, and failures remain in each task document. Returned-state snapshot semantics and partial-failure recovery remain deferred. Custom operation kernels are not required for this milestone.
 

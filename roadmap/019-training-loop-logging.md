@@ -2,6 +2,19 @@
 
 ## Status — 2026-11-13
 
+Merged `origin/main` (`fccd286`) into `feat/Trainer-Log`. Config resolution keeps
+the new required Muon/AdamW optimizer fields and data/model/schedule settings,
+alongside optional logging_steps/eval_steps. Builder preserves build_dataset
+and passes only `lr` to the generic optimizer factory, while retaining all
+Trainer logging/token/evaluation arguments. Logging and scheduled-evaluation
+tests now use the existing full optimizer-config fixture without changing
+their behavioral assertions. Trainer's refactor was not modified.
+
+- `./test.sh` → exit 0, `276 passed in 2.21s`.
+
+No dependencies or test configuration were changed. Next: agree on explicit
+LM perplexity opt-in and its first known-loss test. Earlier records follow.
+
 Scheduled evaluation is implemented. Config defaults `eval_steps` to `None`;
 Builder forwards it to Trainer. `train(..., eval_batches=...)` evaluates at
 the configured interval and at normal completion without repeating a final

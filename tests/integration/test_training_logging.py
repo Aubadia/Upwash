@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from upwash.builder import build_trainer
-from upwash.config import OptimizerConfig, TrainingConfig
+from upwash.config import TrainingConfig
 from upwash.core.logger import MemoryLogger
 from upwash.core.trainer import Trainer
 
@@ -19,7 +19,7 @@ from upwash.core.trainer import Trainer
     ids=["exact-interval", "partial-interval", "two-exact-intervals"],
 )
 def test_built_trainer_logs_interval_mean_loss_and_the_final_partial_interval(
-    num_steps, expected_steps, expected_losses, expected_grad_norms
+    num_steps, expected_steps, expected_losses, expected_grad_norms, make_optimizer_config
 ):
     with torch.random.fork_rng(devices=[]):
         model = torch.nn.Linear(1, 1, bias=False, device="cpu", dtype=torch.float32)
@@ -27,7 +27,7 @@ def test_built_trainer_logs_interval_mean_loss_and_the_final_partial_interval(
         model.weight.zero_()
     logger = MemoryLogger()
     config = TrainingConfig(
-        optimizer=OptimizerConfig(lr=0.1),
+        optimizer=make_optimizer_config(lr=0.1),
         logging_steps=2,
     )
     trainer = build_trainer(
@@ -74,7 +74,7 @@ def test_built_trainer_logs_interval_mean_loss_and_the_final_partial_interval(
     ids=["lr-0.1", "lr-0.05"],
 )
 def test_built_trainer_logs_single_group_learning_rate_with_each_loss_event(
-    lr, expected_weight
+    lr, expected_weight, make_optimizer_config
 ):
     with torch.random.fork_rng(devices=[]):
         model = torch.nn.Linear(1, 1, bias=False, device="cpu", dtype=torch.float32)
@@ -83,7 +83,7 @@ def test_built_trainer_logs_single_group_learning_rate_with_each_loss_event(
     logger = MemoryLogger()
     trainer = build_trainer(
         config=TrainingConfig(
-            optimizer=OptimizerConfig(lr=lr),
+            optimizer=make_optimizer_config(lr=lr),
             logging_steps=2,
         ),
         model=model,
@@ -112,7 +112,7 @@ def test_built_trainer_logs_single_group_learning_rate_with_each_loss_event(
 
 @pytest.mark.parametrize("extra_parameter_kind", ["none", "unused", "frozen"])
 def test_built_trainer_logs_global_l2_gradient_norm_for_one_update(
-    extra_parameter_kind,
+    extra_parameter_kind, make_optimizer_config,
 ):
     with torch.random.fork_rng(devices=[]):
         model = torch.nn.Linear(2, 1, bias=True, device="cpu", dtype=torch.float32)
@@ -130,7 +130,7 @@ def test_built_trainer_logs_global_l2_gradient_norm_for_one_update(
     logger = MemoryLogger()
     trainer = build_trainer(
         config=TrainingConfig(
-            optimizer=OptimizerConfig(lr=0.1),
+            optimizer=make_optimizer_config(lr=0.1),
             logging_steps=1,
         ),
         model=model,
@@ -176,7 +176,7 @@ def test_built_trainer_logs_global_l2_gradient_norm_for_one_update(
     ids=["no-padding", "pad-zero", "pad-one", "all-padding", "disabled"],
 )
 def test_built_trainer_logs_total_input_tokens_including_final_partial_interval(
-    count_tokens, pad_token_id, input_row, expected_counts,
+    count_tokens, pad_token_id, input_row, expected_counts, make_optimizer_config,
 ):
     with torch.random.fork_rng(devices=[]):
         model = torch.nn.Embedding(2, 2, device="cpu", dtype=torch.float32)
@@ -191,7 +191,7 @@ def test_built_trainer_logs_total_input_tokens_including_final_partial_interval(
     logger = MemoryLogger()
     trainer = build_trainer(
         config=TrainingConfig(
-            optimizer=OptimizerConfig(lr=0.1), logging_steps=2,
+            optimizer=make_optimizer_config(lr=0.1), logging_steps=2,
         ),
         model=model,
         loss_fn=next_token_loss,
