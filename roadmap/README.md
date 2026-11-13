@@ -23,6 +23,43 @@ before launching the affected runs.
 
 ## Resume Here
 
+Current task (2026-11-13): [021 — Eval perplexity](021-eval-perplexity.md), on branch `feat/eval-perplexity` (PR #11).
+
+- Agreed interface: `Trainer(..., eval_perplexity=False)` and `build_trainer(..., eval_perplexity=False)`.
+  - When enabled, every event carrying `eval/loss` also carries `eval/perplexity = exp(eval/loss)`.
+  - Overflow gives `inf`, and training continues.
+- Red verified: `5 failed, 4 passed` on the targeted files, all `TypeError` for `eval_perplexity`. The rest of the suite gives `296 passed`.
+- Sanity check: a scratch reference implementation passed the full suite (`302 passed`).
+- Green (2026-11-14): the user implemented it, and the full suite returned `302 passed`. The internal dev data was prepared with `scripts/prepare_dev.py`.
+- 2026-11-14: merged `origin/main` at `9940107` (PR #10) into `feat/eval-perplexity`.
+  - The textual conflict in this file was resolved by keeping both branches' records.
+  - The eval-perplexity builder test was adapted to PR #10's `factory(model, config=...)` contract with the `sgd_optimizer_factory` fixture.
+- Next for evaluation:
+  - Internal dev data: a script that tokenizes `cerulean-works/fineweb-edu-dev` as `[BOS, text, EOS]`, and an eval `DataLoader` in the entry script.
+  - Flock `fineweb_edu` scoring after training. This needs the TA's answer on 8192, a Flock environment, an α-folding HF conversion, a scoring script, and a tiny end-to-end smoke run.
+- Evaluation scope agreed with the teammate:
+  - Internal fineweb-edu dev PPL during training. The dev data is `cerulean-works/fineweb-edu-dev`, prepared as `[BOS, text, EOS]` with the existing `prepare_token_shards`.
+  - Flock `fineweb_edu` scoring after training to compare hyperparameters.
+  - The teammate reports that the training data excludes the 5,000 dev documents.
+- Open: the Flock `fineweb_edu` task refuses a model with `max_length < 8192`, re-read in the Flock docs on 2026-11-13, while training uses context 4096. Ask the TA how these fit.
+
+Teammate PR #10 (`feat/Adaptor`: HF Llama adaptor, Muon + AdamW, WSD scheduler), reviewed 2026-11-14:
+
+- Tests (Docker, `upwash-venv-pr5`, after `uv sync` installed `transformers==5.22.2` with the user's approval):
+  - PR #10 alone: `318 passed`.
+  - Merged with PR #11: `1 failed, 323 passed`. `test_build_trainer_passes_eval_perplexity_to_the_trainer` passes `torch.optim.SGD`, but PR #10 changes the factory contract to `factory(model, config=...)`, which gives `TypeError: SGD.__init__() got an unexpected keyword argument 'config'`. PR #10 merged first, and PR #11 now uses the `sgd_optimizer_factory` fixture.
+  - Only `roadmap/README.md` conflicts textually.
+- Its roadmap files 020–023 collide with merged 020 (device and precision) and PR #11's 021.
+- Fixes deferred by the user, who wants things running first:
+  - Option-B initialization and α are not applied, although `ModelConfig` records them. This must be fixed before any recorded run.
+  - `max_position_embeddings` is 4096, which is pending the host's answer on the Flock 8192 requirement.
+  - Muon/AdamW grouping is by parameter name.
+  - The WSD `"linear"` branch is unreachable.
+  - `train/learning_rate` logs only the Muon group.
+  - The model config doesn't set `use_cache=False`.
+
+Teammate's records from PR #10 (`feat/Adaptor`):
+
 Latest user-directed work: [020 — HF Llama Loss Adapter](020-hf-llama-adaptor.md).
 Latest verification is Green: user's causal_lm_loss implementation passes
 the hand-calculated no-shift example and real HF reference loss/gradient
@@ -221,7 +258,7 @@ remains pending separately.
 
 Device/precision work merged from `origin/main` (the following records describe that branch):
 
-Current task (2026-11-13): [020 — Device placement and bf16 mixed precision](020-device-precision.md), on branch `feat/gpu-bf16` from `main` at `c37845f`.
+Task (2026-11-13): [020 — Device placement and bf16 mixed precision](020-device-precision.md), on branch `feat/gpu-bf16` from `main` at `c37845f`. Merged through PR #9.
 
 - Agreed interface:
   - Trainer moves each batch to the model's parameter device, in both `train` and `evaluate`. There is no `device` argument.
@@ -236,7 +273,7 @@ Current task (2026-11-13): [020 — Device placement and bf16 mixed precision](0
 - Real CUDA execution is not yet verified. Check it in the first nano4 smoke run.
 - Next: commit. GPU timing via `synchronize` and a CUDA-only test marker are deferred.
 
-Numbering (decided 2026-11-13): tasks continue after 019, so device and precision is 020. No number is reserved for the Muon + AdamW builder; it takes the next free number when it starts. Earlier records that call it "task 020" predate this decision. The duplicated 017–019 files from the evaluation and logging work still need renumbering, starting at 021.
+Numbering (decided 2026-11-13): tasks continue after 019, so device and precision is 020. No number is reserved for the Muon + AdamW builder; it takes the next free number when it starts. Earlier records that call it "task 020" predate this decision. Eval perplexity took 021. PR #10 then added 020–023 (HF adaptor, optimizer factory, Muon/AdamW, LR scheduler). Its 020 collides with device and precision, and its 021 with eval perplexity. Together with the earlier duplicated 017–019, renumbering is still pending agreement with the teammate.
 
 Logging work, previous priority: [019 — Training Loop Logging](019-training-loop-logging.md).
 Merge verification: integrated `origin/main` at `fccd286` into

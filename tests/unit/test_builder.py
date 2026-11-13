@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from upwash.builder import build_trainer
@@ -153,3 +154,27 @@ def test_build_trainer_passes_the_configured_precision_to_the_trainer(
     trainer.train([(torch.ones(4, 2), torch.ones(4, 1))])
 
     assert dtypes == [torch.bfloat16]
+
+
+# --- Task 021: eval perplexity --------------------------------------------------------
+
+
+def test_build_trainer_passes_eval_perplexity_to_the_trainer(make_optimizer_config, sgd_optimizer_factory):
+    model = torch.nn.Embedding(8, 8)
+    with torch.no_grad():
+        model.weight.zero_()
+    logger = MemoryLogger()
+
+    trainer = build_trainer(
+        config=TrainingConfig(optimizer=make_optimizer_config(lr=0.0), eval_steps=1),
+        model=model,
+        loss_fn=lambda logits, targets: torch.nn.functional.cross_entropy(logits.reshape(-1, 8), targets.reshape(-1)),
+        optimizer_factory=sgd_optimizer_factory,
+        logger=logger,
+        eval_perplexity=True,
+    )
+    batch = (torch.zeros((1, 4), dtype=torch.long), torch.zeros((1, 4), dtype=torch.long))
+    trainer.train([batch], eval_batches=[batch])
+
+    # Uniform logits over 8 tokens: perplexity 8.
+    assert logger.records[-1]["metrics"]["eval/perplexity"] == pytest.approx(8.0, rel=1e-6)

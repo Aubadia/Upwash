@@ -1,4 +1,5 @@
 import time
+import math
 from contextlib import contextmanager, nullcontext
 
 import torch
@@ -66,6 +67,7 @@ class Trainer:
         pad_token_id=None,
         eval_steps=None,
         precision="fp32",
+        eval_perplexity=False
     ):
         if precision not in ("fp32", "bf16"):
             raise ValueError(f"precision must be 'fp32' or 'bf16', got {precision!r}")
@@ -81,6 +83,7 @@ class Trainer:
         self.eval_steps = eval_steps
         self._total_tokens_seen = 0
         self.precision = precision
+        self.eval_perplexity = eval_perplexity
 
     def compute_loss(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         predictions = self.model(inputs)
@@ -181,7 +184,14 @@ class Trainer:
 
     def _evaluation_metrics(self, batches, interval):
         with interval.exclude_time():
-            return {"eval/loss": self.evaluate(batches)["loss"]}
+            loss = self.evaluate(batches)["loss"]
+        metrics = {"eval/loss": loss}
+        if self.eval_perplexity:
+            try:
+                metrics["eval/perplexity"] = math.exp(loss)
+            except OverflowError:
+                metrics["eval/perplexity"] = math.inf
+        return metrics
 
     def _log_metrics(self, metrics, step, interval):
         """Wrapper function to log without excluded time"""
