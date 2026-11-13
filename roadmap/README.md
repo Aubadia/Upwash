@@ -4,7 +4,24 @@ Last updated: 2026-11-13 (Asia/Taipei).
 
 ## Resume Here
 
-Current task (2026-11-13): [020 — Device placement and bf16 mixed precision](020-device-precision.md), on branch `feat/gpu-bf16` from `main` at `c37845f`.
+Current task (2026-11-13): [021 — Eval perplexity](021-eval-perplexity.md), on a branch stacked on `feat/gpu-bf16`.
+
+- Agreed interface: `Trainer(..., eval_perplexity=False)` and `build_trainer(..., eval_perplexity=False)`.
+  - When enabled, every event carrying `eval/loss` also carries `eval/perplexity = exp(eval/loss)`.
+  - Overflow gives `inf`, and training continues.
+- Red verified: `5 failed, 4 passed` on the targeted files, all `TypeError` for `eval_perplexity`. The rest of the suite gives `296 passed`.
+- Sanity check: a scratch reference implementation passed the full suite (`302 passed`).
+- Green (2026-11-14): the user implemented it, and the full suite returned `302 passed`. On branch `feat/eval-perplexity`, not yet committed.
+- Next for evaluation:
+  - Internal dev data: a script that tokenizes `cerulean-works/fineweb-edu-dev` as `[BOS, text, EOS]`, and an eval `DataLoader` in the entry script.
+  - Flock `fineweb_edu` scoring after training. This needs the TA's answer on 8192, a Flock environment, an α-folding HF conversion, a scoring script, and a tiny end-to-end smoke run.
+- Evaluation scope agreed with the teammate:
+  - Internal fineweb-edu dev PPL during training. The dev data is `cerulean-works/fineweb-edu-dev`, prepared as `[BOS, text, EOS]` with the existing `prepare_token_shards`.
+  - Flock `fineweb_edu` scoring after training to compare hyperparameters.
+  - The teammate reports that the training data excludes the 5,000 dev documents.
+- Open: the Flock `fineweb_edu` task refuses a model with `max_length < 8192`, re-read in the Flock docs on 2026-11-13, while training uses context 4096. Ask the TA how these fit.
+
+Previous task: [020 — Device placement and bf16 mixed precision](020-device-precision.md), on branch `feat/gpu-bf16` from `main` at `c37845f`. PR #9 is open.
 
 - Agreed interface:
   - Trainer moves each batch to the model's parameter device, in both `train` and `evaluate`. There is no `device` argument.
@@ -19,7 +36,7 @@ Current task (2026-11-13): [020 — Device placement and bf16 mixed precision](0
 - Real CUDA execution is not yet verified. Check it in the first nano4 smoke run.
 - Next: commit. GPU timing via `synchronize` and a CUDA-only test marker are deferred.
 
-Numbering (decided 2026-11-13): tasks continue after 019, so device and precision is 020. No number is reserved for the Muon + AdamW builder; it takes the next free number when it starts. Earlier records that call it "task 020" predate this decision. The duplicated 017–019 files from the evaluation and logging work still need renumbering, starting at 021.
+Numbering (decided 2026-11-13): tasks continue after 019, so device and precision is 020. No number is reserved for the Muon + AdamW builder; it takes the next free number when it starts. Earlier records that call it "task 020" predate this decision. Eval perplexity took 021. The duplicated 017–019 files from the evaluation and logging work still need renumbering, starting at 022.
 
 Logging work, previous priority: [019 — Training Loop Logging](019-training-loop-logging.md).
 Merge verification: integrated `origin/main` at `fccd286` into
