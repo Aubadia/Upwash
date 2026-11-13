@@ -1,5 +1,49 @@
 # 020 — Hugging Face Llama Model Adaptor
 
+## Latest Verification — Loss Adapter Red
+
+Added two tests in `tests/unit/test_adaptor.py`: a hand-calculated three-token
+HF output example checks mean loss and logits gradients without shifting or
+dropping positions; a real CPU float32 tiny HF Llama comparison checks scalar
+loss and every parameter gradient against torch cross-entropy with class-axis
+transpose. The real reference forward/backward succeeds before importing the
+Upwash adapter, with nonzero embedding gradients. Reference and Upwash paths
+use independent model copies/inputs, zero dropout, and preserved RNG state.
+The known example also checks targets remain unchanged. Tolerances are
+rtol=1e-6/atol=1e-7 for loss and known logits gradients, and
+rtol=1e-5/atol=1e-7 for real model gradients.
+
+- `./test.sh tests/unit/test_adaptor.py tests/unit/core/test_trainer_loss.py --tb=short`
+  → exit 1, **2 failed, 4 passed in 5.18s**.
+- `./test.sh --tb=short` → exit 1, **2 failed, 296 passed in 3.78s**.
+- Both failures: `ImportError` for missing `causal_lm_loss` from the existing
+  adaptor module. This is intended API Red. Reference execution passes, but
+  Upwash loss/gradient assertions have not executed.
+
+Next: user implements `causal_lm_loss(outputs, targets)` as agreed, then rerun
+for Green. Only tests and roadmap docs changed; no production stubs or
+dependencies. Full HF Builder/Trainer training is a later integration increment.
+Custom initialization/output scaling remain unimplemented and outside this
+loss-adapter test. Earlier records below are historical.
+
+## Agreed Loss Adapter Increment
+
+The user approved `causal_lm_loss(outputs, targets)` in `adaptor.py`.
+It reads HF `outputs.logits` of shape [B, T, V] and computes mean token
+cross-entropy against dense, already-aligned targets [B, T]. Do not shift
+again: PackedTokenDataset already provides next-token targets. Preserve the
+autograd path; Builder/Trainer and the existing model factory stay unchanged.
+
+Reference for upcoming tests: `torch.nn.functional.cross_entropy`, exact
+installed torch **2.15.0+cu132**, using the class dimension [B, V, T]. Real
+output production uses `transformers.LlamaForCausalLM`, exact installed
+transformers **5.22.2**. HF's built-in labels loss is not the oracle, because
+it shifts labels internally. Compare scalar loss and model gradients with
+independent copied state/inputs. Supplement with a hand-calculated three-token
+example using the real HF output container. No dependencies or production
+changes are authorized by this testing increment. Results recorded below
+after execution; older implementation status is historical.
+
 ## Status — 2026-11-13
 
 Implemented `config_adaptor` with the architecture mapping below and corrected the factory

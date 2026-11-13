@@ -1,9 +1,50 @@
 import torch
 
 from upwash.builder import build_trainer
-from upwash.config import TrainingConfig
+from upwash.config import ScheduleConfig, TrainingConfig
 from upwash.core.logger import MemoryLogger
 from upwash.core.trainer import Trainer
+
+
+def test_build_trainer_constructs_and_injects_configured_lr_scheduler(
+    make_optimizer_config, sgd_optimizer_factory,
+):
+    with torch.random.fork_rng(devices=[]):
+        model = torch.nn.Linear(1, 1, bias=False, device="cpu", dtype=torch.float32)
+    initial_weight = model.weight.detach().clone()
+    schedule_config = ScheduleConfig(
+        warmup_ratio=0.1,
+        decay_ratio=0.3,
+        decay_shape="power",
+        decay_power=2.0,
+    )
+
+    class SchedulerStub:
+        def step(self):
+            raise AssertionError("Builder must not advance the scheduler")
+
+    scheduler = SchedulerStub()
+    supplied_optimizers = []
+
+    def lr_scheduler_factory(optimizer, *, config, total_steps):
+        assert config is schedule_config
+        assert total_steps == 100
+        supplied_optimizers.append(optimizer)
+        return scheduler
+
+    trainer = build_trainer(
+        config=TrainingConfig(optimizer=make_optimizer_config(lr=0.1)),
+        model=model,
+        loss_fn=torch.nn.MSELoss(reduction="mean"),
+        optimizer_factory=sgd_optimizer_factory,
+        lr_scheduler_factory=lr_scheduler_factory,
+        schedule_config=schedule_config,
+        total_steps=100,
+    )
+
+    assert supplied_optimizers == [trainer.optimizer]
+    assert trainer.lr_scheduler is scheduler
+    torch.testing.assert_close(model.weight, initial_weight, rtol=0, atol=0)
 
 
 def test_build_trainer_passes_model_and_complete_config_to_muon_factory(make_optimizer_config):
