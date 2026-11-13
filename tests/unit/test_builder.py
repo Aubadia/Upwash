@@ -48,7 +48,7 @@ def test_build_trainer_allows_omitting_logger(make_optimizer_config):
     assert trainer.logger is None
 
 
-# --- Task 021: precision --------------------------------------------------------------
+# --- Task 020: precision --------------------------------------------------------------
 
 
 def test_build_trainer_passes_the_configured_precision_to_the_trainer(make_optimizer_config):

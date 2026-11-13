@@ -1,10 +1,10 @@
-# 021 — Device Placement and bf16 Mixed Precision
+# 020 — Device Placement and bf16 Mixed Precision
 
 ## Behavior
 
 Let Trainer run on a GPU with bf16 mixed precision. Today nothing places tensors on a device: data, model, and computation stay on the CPU, and a model moved to CUDA fails on CPU batches.
 
-Branch `feat/gpu-bf16`, from `main` at `c37845f` (PR #8 merged). Task number 021 because 020 is reserved for the Muon + AdamW builder. The duplicated 017–019 numbers from the logging work are still to be renumbered.
+Branch `feat/gpu-bf16`, from `main` at `c37845f` (PR #8 merged). Numbered 020 as the next number after 019 (decided 2026-11-13). No number is reserved for the Muon + AdamW builder; it takes the next free number when it starts. The duplicated 017–019 numbers from the evaluation and logging work are still to be renumbered.
 
 ## Agreed Interface — 2026-11-13
 

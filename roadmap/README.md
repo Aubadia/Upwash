@@ -4,7 +4,7 @@ Last updated: 2026-11-13 (Asia/Taipei).
 
 ## Resume Here
 
-Current task (2026-11-13): [021 — Device placement and bf16 mixed precision](021-device-precision.md), on branch `feat/gpu-bf16` from `main` at `c37845f`.
+Current task (2026-11-13): [020 — Device placement and bf16 mixed precision](020-device-precision.md), on branch `feat/gpu-bf16` from `main` at `c37845f`.
 
 - Agreed interface:
   - Trainer moves each batch to the model's parameter device, in both `train` and `evaluate`. There is no `device` argument.
@@ -19,7 +19,7 @@ Current task (2026-11-13): [021 — Device placement and bf16 mixed precision](0
 - Real CUDA execution is not yet verified. Check it in the first nano4 smoke run.
 - Next: commit. GPU timing via `synchronize` and a CUDA-only test marker are deferred.
 
-Numbering: 020 stays reserved for the Muon + AdamW builder. The duplicated 017–019 files from the evaluation and logging work still need renumbering, starting at 022.
+Numbering (decided 2026-11-13): tasks continue after 019, so device and precision is 020. No number is reserved for the Muon + AdamW builder; it takes the next free number when it starts. Earlier records that call it "task 020" predate this decision. The duplicated 017–019 files from the evaluation and logging work still need renumbering, starting at 021.
 
 Logging work, previous priority: [019 — Training Loop Logging](019-training-loop-logging.md).
 Merge verification: integrated `origin/main` at `fccd286` into

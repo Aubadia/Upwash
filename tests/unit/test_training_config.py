@@ -113,7 +113,7 @@ def test_optimizer_config_to_dict_returns_every_setting(make_optimizer_config, s
     assert make_optimizer_config().to_dict() == sweep_start_optimizer
 
 
-# --- Task 021: precision --------------------------------------------------------------
+# --- Task 020: precision --------------------------------------------------------------
 
 
 def test_training_config_precision_defaults_to_fp32(make_optimizer_config):
