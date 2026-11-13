@@ -39,8 +39,16 @@ class Trainer:
             self.optimizer.zero_grad()
             loss = self.compute_loss(input, target)
             loss.backward()
+
             if logging_enabled:
                 learning_rate = float(self.optimizer.param_groups[0]["lr"])
+                grad_norms = [
+                    parameter.grad.detach().norm(2)
+                    for parameter in self.model.parameters()
+                    if parameter.grad is not None
+                ]
+                grad_norm = torch.stack(grad_norms).norm(2) if grad_norms else 0.0
+                
             self.optimizer.step()
             steps = steps + 1
 
@@ -52,6 +60,7 @@ class Trainer:
                         {
                             "train/loss": interval_loss.item() / interval_steps,
                             "train/learning_rate": learning_rate,
+                            "train/grad_norm": float(grad_norm),
                         },
                         step=steps,
                     )
@@ -69,6 +78,7 @@ class Trainer:
                 {
                     "train/loss": interval_loss.item() / interval_steps,
                     "train/learning_rate": learning_rate,
+                    "train/grad_norm": float(grad_norm),
                 },
                 step=steps,
             )

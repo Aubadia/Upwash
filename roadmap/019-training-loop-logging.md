@@ -2,6 +2,19 @@
 
 ## Status — 2026-11-13
 
+Trainer now computes global L2 across detached parameter gradients after backward and before the optimizer
+update, excluding parameters without gradients and preserving gradient values.
+Both regular and final-partial events emit `train/grad_norm` for the last
+completed update. Computation runs only when logging is enabled; conversion to
+a Python float happens only on emission. The TODO comment was removed.
+
+- `./test.sh tests/integration/test_training_logging.py` → exit 0,
+  `6 passed in 1.35s`. The existing one-update norm case is Green.
+- Full suite not rerun. No test, dependency, or configuration changes.
+
+Next: add multi-step and final-partial norm assertions. Missing-gradient,
+clipping/AMP, and multi-device behavior remain unverified. Earlier records follow.
+
 Next metric Red: `train/grad_norm`, using the screenshot's existing metric key
 and existing Builder/Trainer API. Baseline `./test.sh` → exit 0,
 `104 passed in 1.80s`. Added

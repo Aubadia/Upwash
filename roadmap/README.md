@@ -5,6 +5,15 @@ Last updated: 2026-11-13 (Asia/Taipei).
 ## Resume Here
 
 Current priority: [019 — Training Loop Logging](019-training-loop-logging.md).
+Latest implementation: Trainer computes global
+gradient L2 after backward and before the optimizer update, leaving gradients
+unchanged. Both interval and final-partial events include `train/grad_norm`
+from the last update. Scalar conversion occurs only when emitting an event.
+`./test.sh tests/integration/test_training_logging.py` → exit 0,
+`6 passed in 1.35s`. Full suite not rerun. Next: add multi-step/final-partial
+norm assertions; clipping/AMP and remote delivery remain unverified.
+Earlier records below are historical.
+
 Latest increment: added the one-update global L2 `train/grad_norm` test using
 real SGD, two weights, and a bias. Expected `sqrt(104)` from gradients
 `[-6, -8, -2]`; update/gradient/loss/LR assertions pass, then the metric lookup
