@@ -30,7 +30,8 @@ def build_muon_adamw(
     if muon_parameters:
         optimizers.append(
             torch.optim.Muon(
-                muon_parameters,
+                # "name" labels the group's learning-rate metric.
+                [{"params": muon_parameters, "name": "muon"}],
                 lr=config.lr,
                 momentum=config.muon_beta,
                 weight_decay=weight_decay,
@@ -40,7 +41,7 @@ def build_muon_adamw(
     if adam_parameters:
         optimizers.append(
             torch.optim.AdamW(
-                adam_parameters,
+                [{"params": adam_parameters, "name": "adamw"}],
                 lr=config.lr * config.adam_lr_multiplier,
                 betas=(config.adam_beta1, config.adam_beta2),
                 weight_decay=weight_decay,  # TODO: Consider adapt seperate weight decay
