@@ -23,6 +23,19 @@ before launching the affected runs.
 
 ## Resume Here
 
+Latest user-directed work: [024 — Configured Training Entry Point](024-training-entrypoint.md).
+Approved `RunConfig -> train(config) -> TrainResult(model, state)`, with real
+Llama execution through sbatch using the project `.venv`. New local tests:
+`./test.sh tests/unit/test_train.py --tb=short` -> exit 1, `3 failed in 2.79s`,
+all for missing `RunConfig`; behavior assertions have not executed.
+Non-Llama regressions: `320 passed in 3.60s`, exit 0; exact exclusions in 024.
+Added `scripts/test_train.sbatch` and an explicitly invoked CUDA smoke test.
+Shell syntax passes, but sbatch is unavailable here; no job was submitted and
+GPU execution remains unverified. Tests/scripts/docs only. Next: user implements
+config/result/entry, verify local Green, then submit from the repository root.
+
+The following entries record prior work:
+
 Current task (2026-11-13): [021 — Eval perplexity](021-eval-perplexity.md), on branch `feat/eval-perplexity` (PR #11).
 
 - Agreed interface: `Trainer(..., eval_perplexity=False)` and `build_trainer(..., eval_perplexity=False)`.
