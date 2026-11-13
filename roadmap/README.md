@@ -21,6 +21,21 @@ Current task (2026-11-13): [021 — Eval perplexity](021-eval-perplexity.md), on
   - The teammate reports that the training data excludes the 5,000 dev documents.
 - Open: the Flock `fineweb_edu` task refuses a model with `max_length < 8192`, re-read in the Flock docs on 2026-11-13, while training uses context 4096. Ask the TA how these fit.
 
+Teammate PR #10 (`feat/Adaptor`: HF Llama adaptor, Muon + AdamW, WSD scheduler), reviewed 2026-11-14:
+
+- Tests (Docker, `upwash-venv-pr5`, after `uv sync` installed `transformers==5.22.2` with the user's approval):
+  - PR #10 alone: `318 passed`.
+  - Merged with PR #11: `1 failed, 323 passed`. `test_build_trainer_passes_eval_perplexity_to_the_trainer` passes `torch.optim.SGD`, but PR #10 changes the factory contract to `factory(model, config=...)`, which gives `TypeError: SGD.__init__() got an unexpected keyword argument 'config'`. Whichever PR merges second must switch that test to the `sgd_optimizer_factory` fixture.
+  - Only `roadmap/README.md` conflicts textually.
+- Its roadmap files 020–023 collide with merged 020 (device and precision) and PR #11's 021.
+- Fixes deferred by the user, who wants things running first:
+  - Option-B initialization and α are not applied, although `ModelConfig` records them. This must be fixed before any recorded run.
+  - `max_position_embeddings` is 4096, which is pending the host's answer on the Flock 8192 requirement.
+  - Muon/AdamW grouping is by parameter name.
+  - The WSD `"linear"` branch is unreachable.
+  - `train/learning_rate` logs only the Muon group.
+  - The model config doesn't set `use_cache=False`.
+
 Previous task: [020 — Device placement and bf16 mixed precision](020-device-precision.md), on branch `feat/gpu-bf16` from `main` at `c37845f`. PR #9 is open.
 
 - Agreed interface:
