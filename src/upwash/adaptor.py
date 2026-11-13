@@ -1,6 +1,14 @@
 from upwash.config import ModelConfig
 
+import torch.nn.functional as F
 from transformers import LlamaConfig, LlamaForCausalLM
+
+def causal_lm_loss(outputs, targets):
+    logits = outputs.logits
+    return F.cross_entropy(
+        logits.reshape(-1, logits.size(-1)),
+        targets.reshape(-1),
+    )
 
 def config_adaptor(config: ModelConfig) -> LlamaConfig:
     return LlamaConfig(

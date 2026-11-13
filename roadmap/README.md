@@ -14,6 +14,14 @@ before launching the affected runs.
 ## Resume Here
 
 Latest user-directed work: [020 — HF Llama Loss Adapter](020-hf-llama-adaptor.md).
+Latest verification is Green: user's causal_lm_loss implementation passes
+the hand-calculated no-shift example and real HF reference loss/gradient
+comparison. Targeted adaptor/core-loss tests: `6 passed in 2.82s`; full
+`./test.sh --tb=short`: `298 passed in 3.39s` (exit 0). No current blocker.
+Next: real tiny HF Llama Builder/Trainer training/evaluation with Muon/AdamW
+and WSD; custom initialization/output scaling remain separate. Agent changed
+documentation only in this check. Earlier Red below is historical.
+
 Approved `causal_lm_loss(outputs, targets)` in adaptor.py: mean token CE over
 outputs.logits [B,T,V] against already-shifted targets [B,T], with no second
 shift and preserved gradients. Added a hand-calculated example and a real HF

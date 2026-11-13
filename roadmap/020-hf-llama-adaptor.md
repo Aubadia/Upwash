@@ -1,5 +1,23 @@
 # 020 — Hugging Face Llama Model Adaptor
 
+## Latest Green — Loss Adapter
+
+The user implemented `causal_lm_loss` using outputs.logits, flattening token
+positions and applying mean cross-entropy without another label shift.
+Both numerical tests now pass: the hand-calculated loss/logits gradients and
+the real HF Llama reference loss/all-parameter gradients. Target preservation
+also passes. Existing core-loss behavior remains Green.
+
+- `./test.sh tests/unit/test_adaptor.py tests/unit/core/test_trainer_loss.py --tb=short`
+  → exit 0, **6 passed in 2.82s**.
+- `./test.sh --tb=short` → exit 0, **298 passed in 3.39s**.
+
+No current blocker. Next: a tiny real HF Llama Builder/Trainer integration
+with this loss, Muon/AdamW and WSD, including actual parameter updates and
+evaluation. That full path is not established by these unit tests. Custom
+initialization/output scaling remain separate. This verification step changed
+documentation only; earlier Red records below are historical.
+
 ## Latest Verification — Loss Adapter Red
 
 Added two tests in `tests/unit/test_adaptor.py`: a hand-calculated three-token
