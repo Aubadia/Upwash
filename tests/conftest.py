@@ -1,6 +1,17 @@
 import pytest
 
 
+@pytest.fixture
+def sgd_optimizer_factory():
+    """Adapt real SGD to the model/config factory contract for regression tests."""
+    import torch
+
+    def build(model, *, config):
+        return torch.optim.SGD(model.parameters(), lr=config.lr)
+
+    return build
+
+
 # Starting point of the 150M sweep: the first value of every grid in the
 # experiment plan (roadmap/017-optimizer-schedule-config.md).
 SWEEP_START_OPTIMIZER = {

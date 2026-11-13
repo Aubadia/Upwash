@@ -59,6 +59,7 @@ class Trainer:
         model: torch.nn.Module,
         loss_fn,
         optimizer,
+        lr_scheduler=None,
         logger=None,
         logging_steps=None,
         count_tokens=False,
@@ -72,6 +73,7 @@ class Trainer:
         self.model = model
         self.loss_fn = loss_fn
         self.optimizer = optimizer
+        self.lr_scheduler = lr_scheduler
         self.logger = logger
         self.logging_steps = logging_steps
         self.count_tokens = count_tokens
@@ -161,6 +163,9 @@ class Trainer:
             )
 
         self.optimizer.step()
+        if self.lr_scheduler is not None:
+            self.lr_scheduler.step() 
+        
         return loss, metrics
 
     def _record_tokens(self, inputs):

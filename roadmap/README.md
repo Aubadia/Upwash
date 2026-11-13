@@ -1,8 +1,225 @@
 # Implementation Progress
 
-Last updated: 2026-11-13 (Asia/Taipei).
+Last updated: 2026-11-14 (Asia/Taipei).
+
+Merge verification: merged `origin/main` at `5d989c7` into `feat/Adaptor`.
+Resolved the progress-log conflict by retaining both branches' records. Adapted
+the incoming Builder precision test to the existing model/config SGD test
+factory. Initial `./test.sh --tb=short`: exit 1, `1 failed, 317 passed`
+because direct SGD rejected the factory's `config` keyword. After adapting the
+test: exit 0, `318 passed in 3.66s`; `git diff --check` passes. No current
+merge blocker. Next for task 020's HF adapter: tiny real HF Builder/Trainer
+integration. Both branches use task number 020; links identify their distinct
+documents, and renumbering remains deferred.
+
+Lab requirements are consolidated in [docs/Spec.md](../docs/Spec.md), including
+compute grants, exact token accounting, architecture, evaluation, forecasts,
+submission, and unresolved source inconsistencies. This documentation update
+adds no API or implementation. Session baseline: `./test.sh` → exit 0,
+`276 passed in 4.67s`. Current priority remains task 019: agree on explicit
+LM perplexity opt-in before writing its first test. External scoring units,
+grant counts, and the official final configuration remain clarification items
+before launching the affected runs.
 
 ## Resume Here
+
+Latest user-directed work: [020 — HF Llama Loss Adapter](020-hf-llama-adaptor.md).
+Latest verification is Green: user's causal_lm_loss implementation passes
+the hand-calculated no-shift example and real HF reference loss/gradient
+comparison. Targeted adaptor/core-loss tests: `6 passed in 2.82s`; full
+`./test.sh --tb=short`: `298 passed in 3.39s` (exit 0). No current blocker.
+Next: real tiny HF Llama Builder/Trainer training/evaluation with Muon/AdamW
+and WSD; custom initialization/output scaling remain separate. Agent changed
+documentation only in this check. Earlier Red below is historical.
+
+Approved `causal_lm_loss(outputs, targets)` in adaptor.py: mean token CE over
+outputs.logits [B,T,V] against already-shifted targets [B,T], with no second
+shift and preserved gradients. Added a hand-calculated example and a real HF
+Llama loss/gradient comparison; reference torch 2.15.0+cu132/transformers 5.22.2
+forward/backward succeeds first. Targeted adaptor/core-loss tests:
+`2 failed, 4 passed in 5.18s`; full `./test.sh --tb=short`:
+`2 failed, 296 passed in 3.78s` (exit 1). Both intended Reds are the missing
+causal_lm_loss import; Upwash numerical assertions have not executed. Next:
+user implements the adapter, then verify Green before full HF training
+integration. Tests/docs only; no environment blocker or production changes.
+
+Latest user-directed work: [023 — LR Scheduler Wiring](023-lr-scheduler.md).
+Latest increment is Green: WSD unit coverage now has 13 explicit examples for
+linear/cosine/nonlinear-power schedules and zero-length/fractional phase
+boundaries, using real Muon/AdamW groups and independently calculated expected
+values. New cases passed immediately. Targeted scheduler/config/training tests:
+`47 passed in 2.41s`; full `./test.sh --tb=short`: `296 passed in 3.38s`
+(exit 0). Tests/docs only; no current blocker. Next: agree on the next training
+increment, such as HF output adaptation; scheduler persistence, broader runtime
+edge guarantees, per-group LR logging and GPU/bf16 remain separate work.
+Earlier results below are historical.
+
+Latest increment is Green: added real WSD + Muon/AdamW + Builder/Trainer
+10-update integration coverage. Both LR groups follow the agreed factors and
+retain their ratio; final parameters match independent real torch references
+using manually assigned LRs. The zero-LR final update leaves all parameters
+unchanged; logged first-group LRs describe the updates actually used.
+Targeted tests: `4 passed in 2.49s`; full `./test.sh --tb=short`:
+`284 passed in 3.64s` (exit 0). The test passed immediately, with no new Red
+or production changes in this increment. No current blocker. Next: numerical
+cosine/nonlinear-power and phase-boundary coverage, then HF output adaptation
+and device/bf16 milestones. Earlier Red records below are historical.
+
+Current increment: user approved WSD rounding/endpoints. Added the agreed
+10-update linear schedule test for real Muon/AdamW groups with base LRs
+0.008/0.0128, checking common factors and mutation of original groups.
+Targeted scheduler/config/timing tests: `1 failed, 32 passed in 2.52s`;
+full `./test.sh --tb=short`: `1 failed, 282 passed in 3.43s` (exit 1).
+Sole intended Red: missing `upwash.components.schedulers` at the
+`build_wsd_scheduler` import; both child optimizers construct successfully.
+Numerical schedule assertions have not executed. Next: user implements
+`components/schedulers/wsd.py`, then verify Green. No production changes or
+environment blockers. Boundary/nonlinear schedule cases remain later tests.
+Earlier results below are historical.
+
+Latest verification is Green: Trainer advances its optional lr_scheduler
+after optimizer.step(). Timing/used-LR test now passes all assertions.
+Targeted tests: `7 passed in 2.24s`; full `./test.sh --tb=short`:
+`282 passed in 3.40s` (exit 0). Next: confirm WSD rounding and first/final
+update conventions before its first numerical test. No concrete scheduler
+exists yet; proposed multipliers are recorded in task 023. No production/test
+changes in this verification step. Earlier results below are historical.
+
+Current increment: Builder wiring is Green (`4 passed in 2.33s`). Added a
+real-SGD two-update integration test with a halving scheduler test double.
+Expected used LRs 0.1/0.05 yield final weight 0.56; actual is approximately
+0.72 because Trainer never advances its injected scheduler. Targeted tests:
+`1 failed, 6 passed in 2.50s`; full `./test.sh --tb=short`:
+`1 failed, 281 passed in 3.32s` (exit 1). Next: user calls optional
+`lr_scheduler.step()` after optimizer.step(), retaining logs of used LR, then
+verify Green. Scheduler count/final LR/log assertions remain behind the weight
+failure; WSD math is not tested yet. Agent changed tests/docs only.
+Earlier results below are historical.
+
+Newest verification: optional defaults are fixed; all 48 old regressions are
+resolved. Targeted tests: `1 failed, 35 passed in 2.33s`; full
+`./test.sh --tb=short`: `1 failed, 280 passed in 3.43s` (exit 1).
+Sole Red is Builder rejecting `schedule_config`; it still needs that input,
+`total_steps`, and the factory call with optimizer/config/total_steps.
+No production/test changes during verification. Earlier results below are
+historical.
+
+Full-suite recheck after the user's report: `./test.sh --tb=short` → exit 1,
+`49 failed, 232 passed in 3.67s`. The 48 old failures come from required
+`lr_scheduler`/`lr_scheduler_factory` inputs; the new test fails on missing
+`schedule_config`. No numerical training/scheduler assertions execute in these
+cases. Next: restore optional `None` defaults, add Builder schedule inputs and
+forward optimizer/config/total_steps. Documentation-only verification step.
+
+User corrected the Trainer argument/attribute to `lr_scheduler`; the test now
+expects `trainer.lr_scheduler`. Builder factory remains `lr_scheduler_factory`.
+Trainer now saves the value. Earlier naming discussion below is historical;
+remaining work is optional defaults and passing optimizer/config/total_steps
+to the factory.
+
+Latest targeted recheck: `5 failed, 31 passed in 2.29s` (exit 1).
+Builder rejects `schedule_config` and requires `lr_scheduler_factory`, breaking
+four existing callers. Source also calls the scheduler factory without its
+required inputs; Trainer requires `lr_scheduler` but does not store it. Tests
+still expect the earlier agreed `trainer.scheduler` name. Next: complete
+optional defaults, factory arguments and Trainer storage; reconcile naming
+before changing expectations. No full-suite run or production/test changes.
+The first Red result below is historical.
+
+User chose Builder inputs `lr_scheduler_factory`, `schedule_config`, and
+`total_steps`, with no `partial` required. First test expects the factory to
+receive the constructed optimizer plus settings, and its result to be stored
+as `trainer.lr_scheduler`, without advancing training/scheduling during construction.
+`./test.sh tests/unit/test_builder.py tests/unit/test_schedule_config.py tests/integration/test_muon_adamw_trainer.py --tb=short`
+→ exit 1, `1 failed, 35 passed in 4.24s`. Sole intended Red: Builder rejects
+the new `lr_scheduler_factory` keyword. No environment blocker or production
+edits. Next: user implements optional Builder inputs and Trainer scheduler
+storage, then verify Green. Update timing and WSD mathematics remain later
+tests; full suite not rerun after this new test.
+
+Latest user-directed work: [022 — Muon and AdamW Factory](022-muon-adamw-factory.md).
+Builder integration is now Green. The factory/CombinedOptimizer pass the
+original group/config test. Added a real CPU tiny-LM two-batch training test
+using `partial(build_muon_adamw, model_config=model_config)` with the existing
+Builder; parameters and last-batch gradients match independent torch Muon and
+AdamW references. Bias and tied-embedding updates are covered. Targeted tests:
+`5 passed in 3.08s`; full `./test.sh --tb=short`: `280 passed in 3.42s`
+(exit 0). No production changes or new Red in this step. No current blocker.
+Next: agree on further behavior; direct HF output adaptation, optimizer edge
+cases, schedules/checkpoints and per-group LR logging remain pending.
+Earlier implementation and Red records below are historical.
+
+Approved `build_muon_adamw(model, *, config, model_config)` under
+`components/optimizers/muon_adamw.py`, using `ModelConfig.d_model` for decay
+scaling. Attention/MLP matrices go to Muon; embedding/head/norm/bias to AdamW;
+tied weights are assigned once. First test uses a real tiny tied HF Llama
+and real torch 2.15.0+cu132 reference optimizers, which construct successfully.
+Targeted factory/Builder/adaptor tests: `1 failed, 4 passed in 3.84s`;
+full `./test.sh --tb=short`: `1 failed, 278 passed in 3.55s` (both exit 1).
+Sole intended Red is the missing `upwash.components` module at the agreed
+factory import; Upwash group assertions have not executed. No environment
+blocker or production edits. Next: user implements factory/combined optimizer,
+then verify Green before update and gradient-clearing increments.
+
+Latest user-directed work: [021 — Model-Aware Optimizer Factory](021-optimizer-factory.md).
+Latest verification is Green: user implemented
+`optimizer_factory(model, config=config.optimizer)`. Real Muon factory test
+passes. Legacy SGD test callers now use a shared test-only adapter, retaining
+all numerical expectations. Targeted Builder/config/logging/evaluation tests:
+`72 passed in 2.37s`; full `./test.sh`: `278 passed in 3.30s` (both exit 0).
+No current blocker. This completes factory injection; next agree on the
+production Muon/AdamW factory and parameter grouping before writing its tests.
+The current Muon factory is test-local. Agent changed tests/docs only.
+Earlier failure records below are historical.
+
+Newest check: the single Muon factory test still fails because Builder passes
+`model.parameters()` rather than `model`. The `config=` keyword is fixed.
+Command: `./test.sh tests/unit/test_builder.py::test_build_trainer_passes_model_and_complete_config_to_muon_factory --tb=short`.
+Next: user passes the complete model; then migrate legacy SGD test callers and
+verify Green. No broader tests or production edits in this check.
+
+Latest implementation check: the targeted Builder/config command below now
+returns `5 failed, 43 passed in 1.55s` (exit 1). Builder passes
+`model.parameters(), lr=config.optimizer`: Muon factory rejects `lr`, while
+old SGD callers receive a config object as their numerical learning rate.
+Next: user changes the call to `optimizer_factory(model, config=config.optimizer)`;
+then adapt legacy SGD test callers. Full suite not rerun. The original Red
+result below is historical.
+
+Agreed contract: `optimizer_factory(model, *, config: OptimizerConfig)`;
+the user requested real Muon in the test. A standalone CPU Muon gradient
+update succeeds with torch 2.15.0+cu132. New Builder test is intended Red:
+`./test.sh tests/unit/test_builder.py tests/integration/test_built_trainer.py tests/unit/test_training_config.py`
+→ exit 1, `1 failed, 47 passed in 2.16s`. Builder still passes `lr=` instead
+of the complete config/model; factory assertions have not executed. No
+environment blocker or production changes. Next: user changes the Builder
+call; adapt old SGD test callers to the approved contract and verify Green.
+Combined Muon/AdamW parameter grouping and width-scaled decay remain later
+increments. Full suite not rerun.
+
+Latest user-directed work: [020 — HF Llama Adaptor](020-hf-llama-adaptor.md).
+Implemented the config adaptor and corrected
+the factory name to `build_llama_model`. Latest verification:
+`./test.sh tests/unit/test_adaptor.py tests/unit/test_model_config.py` → exit 0,
+`58 passed in 2.76s`. CPU construction and the 4,432-parameter count are Green;
+the full suite was not rerun. No current blocker. Next: agree on initialization,
+output scaling and detailed forward tests; custom initialization/output scaling
+remain unimplemented. The previous Red record below is historical.
+
+The user approved `build_llama_model(ModelConfig)` returning a CPU
+`LlamaForCausalLM`; `adaptor.py` is empty. The first test checks type, parameter
+devices and a hand-calculated 4,432-parameter tiny model. The user installed
+transformers, locked at 5.22.2 (torch 2.15.0). Real HF reference construction
+succeeded on CPU with exactly 4,432 parameters. Targeted adaptor/config command:
+`1 failed, 57 passed in 2.56s`; full `./test.sh`: `1 failed, 276 passed in 3.50s`.
+Sole failure is the missing `build_llama_model` import, the intended API Red;
+Upwash model assertions have not executed. The earlier dependency blocker is resolved.
+Baseline recheck: model config `57 passed`; full `./test.sh` → exit 0,
+`276 passed in 4.69s`. Next: user implements the configured CPU model factory,
+then verify Green. Initialization/output scaling need later tests. Logging work below
+remains pending separately.
+
+Device/precision work merged from `origin/main` (the following records describe that branch):
 
 Current task (2026-11-13): [020 — Device placement and bf16 mixed precision](020-device-precision.md), on branch `feat/gpu-bf16` from `main` at `c37845f`.
 
