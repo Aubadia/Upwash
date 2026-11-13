@@ -46,3 +46,23 @@ def test_build_trainer_allows_omitting_logger(make_optimizer_config):
     )
 
     assert trainer.logger is None
+
+
+# --- Task 020: precision --------------------------------------------------------------
+
+
+def test_build_trainer_passes_the_configured_precision_to_the_trainer(make_optimizer_config):
+    with torch.random.fork_rng(devices=[]):
+        model = torch.nn.Linear(2, 1, bias=False)
+    dtypes = []
+    model.register_forward_hook(lambda module, inputs, output: dtypes.append(output.dtype))
+
+    trainer = build_trainer(
+        config=TrainingConfig(optimizer=make_optimizer_config(lr=0.1), precision="bf16"),
+        model=model,
+        loss_fn=torch.nn.MSELoss(reduction="mean"),
+        optimizer_factory=torch.optim.SGD,
+    )
+    trainer.train([(torch.ones(4, 2), torch.ones(4, 1))])
+
+    assert dtypes == [torch.bfloat16]

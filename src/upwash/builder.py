@@ -12,6 +12,7 @@ def build_trainer(
         logger=None,
         count_tokens=False,
         pad_token_id=None,
+
     ) -> Trainer:
     optim = optimizer_factory(model.parameters(), lr=config.optimizer.lr)
     return Trainer(
@@ -23,6 +24,7 @@ def build_trainer(
         count_tokens=count_tokens,
         pad_token_id=pad_token_id,
         eval_steps=config.eval_steps,
+        precision=config.precision
     )
 
 def build_dataset(config: DataConfig):

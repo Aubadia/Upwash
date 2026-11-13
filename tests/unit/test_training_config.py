@@ -111,3 +111,14 @@ def test_optimizer_config_rejects_negative_or_nonfinite_weight_decay(make_optimi
 def test_optimizer_config_to_dict_returns_every_setting(make_optimizer_config, sweep_start_optimizer):
     # Used to record the run's settings, e.g. FlockLogger(config=...).
     assert make_optimizer_config().to_dict() == sweep_start_optimizer
+
+
+# --- Task 020: precision --------------------------------------------------------------
+
+
+def test_training_config_precision_defaults_to_fp32(make_optimizer_config):
+    assert TrainingConfig(optimizer=make_optimizer_config()).precision == "fp32"
+
+
+def test_training_config_exposes_bf16_precision(make_optimizer_config):
+    assert TrainingConfig(optimizer=make_optimizer_config(), precision="bf16").precision == "bf16"
