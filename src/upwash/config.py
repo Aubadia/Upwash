@@ -61,6 +61,9 @@ class DataConfig:
     format: str
     seq_len: int
     num_tokens: int
+    # None keeps storage order; an int applies a seeded sample-level permutation
+    # over the whole pool before truncation, so shorter runs read a prefix of it.
+    shuffle_seed: int | None = None
 
     def __post_init__(self):
         if not (self.format == "npy" or self.format == "bin"):
@@ -127,17 +130,37 @@ class ModelConfig:
         return self.d_model // self.n_heads
 
 class TrainingConfig:
-    def __init__(self, optimizer: OptimizerConfig, logging_steps=None, eval_steps=None, precision="fp32") -> None:
+    def __init__(
+        self,
+        optimizer: OptimizerConfig,
+        logging_steps=None,
+        eval_steps=None,
+        precision="fp32",
+        max_grad_norm=None,
+    ) -> None:
+        if max_grad_norm is not None and not (math.isfinite(max_grad_norm) and max_grad_norm > 0):
+            raise ValueError(f"max_grad_norm must be a finite number > 0, got {max_grad_norm}")
         self.optimizer = optimizer
         self.logging_steps = logging_steps
         self.eval_steps = eval_steps
         self.precision = precision
+        self.max_grad_norm = max_grad_norm
+
+    def to_dict(self):
+        return {
+            "optimizer": self.optimizer.to_dict(),
+            "logging_steps": self.logging_steps,
+            "eval_steps": self.eval_steps,
+            "precision": self.precision,
+            "max_grad_norm": self.max_grad_norm,
+        }
 
 
 @dataclass
 class LoggingConfig:
     project: str
     name: str
+    group: str | None = None
 
 
 @dataclass
@@ -152,6 +175,13 @@ class RunConfig:
     device: str = "cpu"
     seed: int = 0
     logging: LoggingConfig | None = None
+    # Export after training: an alpha-folded HF model (plus tokenizer when given).
+    output_dir: str | None = None
+    tokenizer: str | None = None
+    tokenizer_revision: str | None = None
+    # Exported config only; default RoPE does not read it, so values > max_seq_len
+    # change no logits for inputs <= max_seq_len (Flock fineweb_edu wants >= 8192).
+    export_max_position_embeddings: int | None = None
 
     def __post_init__(self):
         for name in ("batch_size", "eval_batch_size"):
@@ -160,3 +190,47 @@ class RunConfig:
                 raise ValueError(f"{name} must be a positive integer, got {value}")
         if self.train_data.num_tokens % self.train_data.seq_len:
             raise ValueError("train_data.num_tokens must be divisible by seq_len")
+
+    def to_dict(self):
+        """JSON-compatible form, used for the wandb run config and to reload a run."""
+        return {
+            "model": self.model.to_dict(),
+            "train_data": self.train_data.to_dict(),
+            "eval_data": None if self.eval_data is None else self.eval_data.to_dict(),
+            "training": self.training.to_dict(),
+            "schedule": self.schedule.to_dict(),
+            "batch_size": self.batch_size,
+            "eval_batch_size": self.eval_batch_size,
+            "device": self.device,
+            "seed": self.seed,
+            "logging": None if self.logging is None else asdict(self.logging),
+            "output_dir": self.output_dir,
+            "tokenizer": self.tokenizer,
+            "tokenizer_revision": self.tokenizer_revision,
+            "export_max_position_embeddings": self.export_max_position_embeddings,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "RunConfig":
+        data = dict(data)
+        training = dict(data.pop("training"))
+        training["optimizer"] = OptimizerConfig(**training["optimizer"])
+        eval_data = data.pop("eval_data", None)
+        logging = data.pop("logging", None)
+        return cls(
+            model=ModelConfig(**data.pop("model")),
+            train_data=DataConfig(**data.pop("train_data")),
+            eval_data=None if eval_data is None else DataConfig(**eval_data),
+            training=TrainingConfig(**training),
+            schedule=ScheduleConfig(**data.pop("schedule")),
+            logging=None if logging is None else LoggingConfig(**logging),
+            **data,
+        )
+
+
+def load_run_config(path) -> RunConfig:
+    """Read a JSON run config; unknown or missing keys raise TypeError."""
+    import json
+    from pathlib import Path
+
+    return RunConfig.from_dict(json.loads(Path(path).read_text()))
