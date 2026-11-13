@@ -8,18 +8,30 @@ from upwash.core.data import PackedTokenDataset, Truncate, ConcatDataset
 def build_trainer(
         config: TrainingConfig,
         model: torch.nn.Module,
-        loss_fn, optimizer_factory,
+        loss_fn, 
+        optimizer_factory,
+        lr_scheduler_factory=None,
+        schedule_config=None,
+        total_steps=None,
         logger=None,
         count_tokens=False,
         pad_token_id=None,
         eval_perplexity = False,
 
     ) -> Trainer:
-    optim = optimizer_factory(model.parameters(), lr=config.optimizer.lr)
+    optim = optimizer_factory(model, config=config.optimizer)
+
+    lr_scheduler = (
+        lr_scheduler_factory(optim, config=schedule_config, total_steps=total_steps) 
+        if lr_scheduler_factory is not None 
+        else None
+    )
+
     return Trainer(
         model=model,
         loss_fn=loss_fn,
         optimizer=optim,
+        lr_scheduler=lr_scheduler,
         logger=logger,
         logging_steps=config.logging_steps,
         count_tokens=count_tokens,

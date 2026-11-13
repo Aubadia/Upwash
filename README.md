@@ -1,5 +1,9 @@
 # Upwash
 
+The [lab specification](docs/Spec.md) records the training target, experiment
+constraints, evaluation, logging, forecasting, and submission requirements.
+See the [roadmap](roadmap/README.md) for implementation progress and test evidence.
+
 ## Running tests
 
 Prepare `.venv` with the project dependencies, including pytest, then run:
