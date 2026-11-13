@@ -1,5 +1,7 @@
 from huggingface_hub import hf_hub_download
 from tokenizers import Tokenizer
+import os
+from pathlib import Path
 
 from upwash.core.data import load_dev_ids, prepare_token_shards
 
@@ -15,8 +17,9 @@ DEV_FILENAME = "dev-ids.txt"
 TOKENIZER_REPO = "meta-llama/Llama-3.2-1B"
 TOKENIZER_REVISION = "4e20de362430cd3b72f300e6b0f18e50e7166e08"
 
-CACHE_DIR = ".cache/huggingface"
-OUTPUT_DIR = ".cache/tokens"
+WORK_ROOT = Path("/work") / os.environ["USER"]
+CACHE_DIR = str(WORK_ROOT / ".cache/huggingface")
+OUTPUT_DIR = str(WORK_ROOT / "fineweb-edu-bin")
 
 def main():
     path = hf_hub_download(TOKENIZER_REPO, "tokenizer.json", 

@@ -23,7 +23,11 @@ before launching the affected runs.
 
 ## Resume Here
 
-Current task (2026-11-14): [024 — Option-B initialization for the HF Llama](024-llama-initialization.md), on branch `feat/llama-init` from `main` at `be696b0` (PR #11 merged).
+Current task (2026-11-14): [025 — Option-B initialization for the HF Llama](025-llama-initialization.md), on branch `feat/llama-init` (PR #12) from `main` at `be696b0`.
+
+- Merged `origin/main` at `412b09b` (PR #13, training entry point) on 2026-11-14.
+  - Renumbered this task from 024 to 025, because PR #13's training entry point took 024.
+  - The textual conflict in this file was resolved by keeping both records.
 
 - Agreed (option C):
   - `output_multiplier(config) = (output_std_coeff / d_model) / embedding_std`.
@@ -32,9 +36,24 @@ Current task (2026-11-14): [024 — Option-B initialization for the HF Llama](02
 - Red: `14 failed, 3 passed`, and the rest of the suite gives `324 passed`. A scratch reference implementation passed `341 passed`.
 - Green: the user implemented it, and the full suite returned `341 passed`.
 - Next:
-  - Commit and open a PR.
-  - `export_hf_model` (a fresh model, α folded into the final norm) is deferred until Flock scoring.
+  - PR #12 review.
+  - `export_hf_model` (a fresh model, α folded into the final norm) is deferred until Flock scoring and Hugging Face submission.
   - `max_position_embeddings` waits for the host's answer on 8192.
+
+Teammate's training entry point, merged through PR #13. Its records follow.
+
+Latest user-directed work: [024 — Configured Training Entry Point](024-training-entrypoint.md).
+Approved `RunConfig -> train(config) -> TrainResult(model, state)`, with real
+Llama execution through sbatch using the project `.venv`. New local tests:
+`./test.sh tests/unit/test_train.py --tb=short` -> exit 1, `3 failed in 2.79s`,
+all for missing `RunConfig`; behavior assertions have not executed.
+Non-Llama regressions: `320 passed in 3.60s`, exit 0; exact exclusions in 024.
+Added `scripts/test_train.sbatch` and an explicitly invoked CUDA smoke test.
+Shell syntax passes, but sbatch is unavailable here; no job was submitted and
+GPU execution remains unverified. Tests/scripts/docs only. Next: user implements
+config/result/entry, verify local Green, then submit from the repository root.
+
+The following entries record prior work:
 
 Previous task (2026-11-13): [021 — Eval perplexity](021-eval-perplexity.md), on branch `feat/eval-perplexity`. Merged through PR #11.
 

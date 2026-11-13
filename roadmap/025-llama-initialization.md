@@ -1,10 +1,10 @@
-# 024 — Option-B Initialization for the HF Llama
+# 025 — Option-B Initialization for the HF Llama
 
 ## Behavior
 
 Apply the option-B initialization recorded in [019](019-model-config.md) to the HF Llama built by `build_llama_model` (PR #10, `src/upwash/adaptor.py`). Until now the model used HF's default initialization (std 0.02, no output multiplier), while `ModelConfig.embedding_std` and `output_std_coeff`, which are logged in the run config, described something else.
 
-Numbered 024 as the next free number after PR #10's 020–023 and PR #11's 021. Branch `feat/llama-init`, from `main` at `be696b0` (PRs #10 and #11 merged).
+Numbered 025 (renumbered from 024 on 2026-11-14, because PR #13's training entry point took 024). Branch `feat/llama-init`, from `main` at `be696b0` (PRs #10 and #11 merged).
 
 ## Agreed Interface — 2026-11-14 (option C)
 
