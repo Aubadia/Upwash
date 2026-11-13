@@ -42,8 +42,6 @@ set +a
 
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
 export HF_HUB_OFFLINE=1
-export FINEWEB_TRAIN_ROOT="${FINEWEB_TRAIN_ROOT:-/work/$USER/fineweb-edu-llama3}"
-export FINEWEB_DEV_ROOT="${FINEWEB_DEV_ROOT:-/work/$USER/fineweb-edu-dev-tokens}"
 export HF_HOME="/work/$USER/.cache/huggingface"
 export TMPDIR="/work/$USER/upwash/tmp/${SLURM_JOB_ID}"
 export WANDB_DIR="/work/$USER/upwash/wandb"
@@ -54,7 +52,7 @@ export WANDB_BASE_URL="${WANDB_BASE_URL:-https://flock-api.cerulean.works}"
 : "${WANDB_API_KEY:?Set WANDB_API_KEY in the repository-root .env}"
 export WANDB_API_KEY
 export FLOCK_PROJECT="${FLOCK_PROJECT:-lab6-predictable-scaling}"
-export FLOCK_RUN_NAME="${FLOCK_RUN_NAME:-fineweb-smoke-${SLURM_JOB_ID}-$(date +%Y%m%d-%H%M%S)}"
+export FLOCK_RUN_NAME="${FLOCK_RUN_NAME:-synthetic-llama-smoke-${SLURM_JOB_ID}-$(date +%Y%m%d-%H%M%S)}"
 
 srun ./test.sh \
     tests/unit/test_adaptor.py \
