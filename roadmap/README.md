@@ -23,6 +23,25 @@ before launching the affected runs.
 
 ## Resume Here
 
+Current task (2026-11-14): [025 — Option-B initialization for the HF Llama](025-llama-initialization.md), on branch `feat/llama-init` (PR #12) from `main` at `be696b0`.
+
+- Merged `origin/main` at `412b09b` (PR #13, training entry point) on 2026-11-14.
+  - Renumbered this task from 024 to 025, because PR #13's training entry point took 024.
+  - The textual conflict in this file was resolved by keeping both records.
+
+- Agreed (option C):
+  - `output_multiplier(config) = (output_std_coeff / d_model) / embedding_std`.
+  - `build_llama_model` initializes the embedding with std `embedding_std`, and the hidden `nn.Linear` weights inside `model.model.layers` with std `in_features ** -0.5`. Norms stay ones, and `lm_head` stays tied.
+  - It registers a forward hook on `lm_head` that multiplies logits by α. The model type, `causal_lm_loss`, and entry-script calls are unchanged.
+- Red: `14 failed, 3 passed`, and the rest of the suite gives `324 passed`. A scratch reference implementation passed `341 passed`.
+- Green: the user implemented it, and the full suite returned `341 passed`.
+- Next:
+  - PR #12 review.
+  - `export_hf_model` (a fresh model, α folded into the final norm) is deferred until Flock scoring and Hugging Face submission.
+  - `max_position_embeddings` waits for the host's answer on 8192.
+
+Teammate's training entry point, merged through PR #13. Its records follow.
+
 Latest user-directed work: [024 — Configured Training Entry Point](024-training-entrypoint.md).
 Approved `RunConfig -> train(config) -> TrainResult(model, state)`, with real
 Llama execution through sbatch using the project `.venv`. New local tests:
@@ -36,7 +55,7 @@ config/result/entry, verify local Green, then submit from the repository root.
 
 The following entries record prior work:
 
-Current task (2026-11-13): [021 — Eval perplexity](021-eval-perplexity.md), on branch `feat/eval-perplexity` (PR #11).
+Previous task (2026-11-13): [021 — Eval perplexity](021-eval-perplexity.md), on branch `feat/eval-perplexity`. Merged through PR #11.
 
 - Agreed interface: `Trainer(..., eval_perplexity=False)` and `build_trainer(..., eval_perplexity=False)`.
   - When enabled, every event carrying `eval/loss` also carries `eval/perplexity = exp(eval/loss)`.

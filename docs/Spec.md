@@ -228,6 +228,26 @@ until calibration results and allows adjustment based on research-log quality.
   project choices, not mandatory lab recipes. Config validation does not prove
   runtime optimizer, scheduler, initialization, or model behavior.
 
+## Verified Upwash Snapshot — 2026-11-14
+
+Full suite (Docker, `upwash-venv-pr5`, `transformers==5.22.2`): **348 passed**, on branch `feat/llama-init` (task 025) after merging `main` at `412b09b` (PR #13). Since the 2026-11-13 snapshot below, these are implemented and tested on CPU:
+
+- Device placement and bf16 mixed precision (task 020, `device-precision`).
+- `eval/perplexity` with explicit opt-in (task 021, `eval-perplexity`), and the prepared fineweb-edu dev shard.
+- HF Llama construction, Muon/AdamW, and WSD scheduling (PR #10).
+- Option-B initialization with a forward-hook output multiplier (task 025, PR #12).
+- A configured training entry point, `RunConfig` → `train(config)` (task 024, PR #13). Its Slurm CUDA smoke test is not yet run.
+
+Still not established:
+
+- Multi-group LR logging.
+- Exact-budget stopping, checkpoint and resume, and real CUDA and distributed behavior.
+- Remote metric delivery.
+- Export with α folded into the final norm, and Flock scoring.
+- Flock's 8192-context requirement against the 4096 training context.
+
+The snapshot below is historical.
+
 ## Verified Upwash Snapshot — 2026-11-13
 
 `./test.sh` returned exit 0: **276 passed in 4.67s** before this documentation
