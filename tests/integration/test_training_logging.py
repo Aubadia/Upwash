@@ -1,3 +1,5 @@
+import time
+
 import pytest
 import torch
 
@@ -49,6 +51,7 @@ def test_built_trainer_logs_interval_mean_loss_and_the_final_partial_interval(
     assert logged_losses == pytest.approx(expected_losses, rel=1e-6, abs=1e-6)
     assert all(
         "train/total_tokens_seen" not in record["metrics"]
+        and "train/tokens_per_second" not in record["metrics"]
         for record in logger.records
     )
     # Pre-update gradients: -4, -3.2, -2.56, -2.048. Log the last step's L2.
@@ -218,6 +221,7 @@ def test_built_trainer_logs_total_input_tokens_including_final_partial_interval(
     if expected_counts is None:
         assert all(
             "train/total_tokens_seen" not in record["metrics"]
+            and "train/tokens_per_second" not in record["metrics"]
             for record in logger.records
         )
         return
@@ -259,3 +263,115 @@ def test_token_total_persists_across_training_calls_without_counting_evaluation(
         record["metrics"]["train/total_tokens_seen"] for record in logger.records
     ] == [3, 9]
     assert model.weight[1, 0].item() > 0
+
+
+@pytest.mark.parametrize(
+    ("pad_token_id", "input_pattern", "expected_totals", "expected_rates"),
+    [
+        (None, [1, 1], [16, 20], [1.6, 0.8]),
+        (0, [0, 1], [8, 10], [0.8, 0.4]),
+        (0, [0, 0], [0, 0], [0.0, 0.0]),
+    ],
+    ids=["no-padding", "mixed-padding", "all-padding"],
+)
+def test_throughput_includes_data_loading_and_excludes_logging_time(
+    monkeypatch, pad_token_id, input_pattern, expected_totals, expected_rates,
+):
+    elapsed = [0.0]
+
+    def advance(seconds):
+        elapsed[0] += seconds
+
+    class SlowLogger(MemoryLogger):
+        def log(self, metrics, *, step):
+            super().log(metrics, step=step)
+            advance(100.0)
+
+    with torch.random.fork_rng(devices=[]):
+        model = torch.nn.Embedding(2, 2, device="cpu", dtype=torch.float32)
+    with torch.no_grad():
+        model.weight.zero_()
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+    logger = SlowLogger()
+    trainer = Trainer(
+        model=model,
+        loss_fn=torch.nn.CrossEntropyLoss(),
+        optimizer=optimizer,
+        logger=logger,
+        logging_steps=2,
+        count_tokens=True,
+        pad_token_id=pad_token_id,
+    )
+    # Advance simulated time without replacing real autograd or SGD updates.
+    model.register_forward_pre_hook(lambda module, args: advance(2.0))
+    model.weight.register_hook(lambda grad: advance(1.0))
+    optimizer.register_step_post_hook(lambda optim, args, kwargs: advance(1.0))
+
+    def batches():
+        for num_tokens in (8, 8, 4):
+            advance(1.0)
+            yield (
+                torch.tensor(input_pattern * (num_tokens // 2), dtype=torch.int64),
+                torch.zeros(num_tokens, dtype=torch.int64, device="cpu"),
+            )
+        # Discovering exhaustion must not extend the last update's duration.
+        advance(50.0)
+
+    monkeypatch.setattr(time, "perf_counter", lambda: elapsed[0])
+    state = trainer.train(batches())
+
+    assert state.global_step == 3
+    used_token = input_pattern[-1]
+    assert model.weight[used_token, 0].item() > 0
+    assert model.weight[used_token, 1].item() < 0
+    assert [record["step"] for record in logger.records] == [2, 3]
+    assert [
+        record["metrics"]["train/total_tokens_seen"] for record in logger.records
+    ] == expected_totals
+    # Each batch costs 1s loading + 2s forward + 1s backward + 1s SGD.
+    # Before padding exclusion, the final partial interval is 4 tokens / 5s.
+    rates = [
+        record["metrics"]["train/tokens_per_second"] for record in logger.records
+    ]
+    assert all(isinstance(rate, float) for rate in rates)
+    assert rates == pytest.approx(expected_rates, rel=1e-6, abs=1e-6)
+
+    # Neither an idle gap nor evaluation belongs to the next training interval.
+    advance(500.0)
+    trainer.evaluate([
+        (torch.ones(4, dtype=torch.int64), torch.zeros(4, dtype=torch.int64))
+    ])
+    assert len(logger.records) == 2
+    assert trainer.train(batches()).global_step == 3
+    assert [record["step"] for record in logger.records] == [2, 3, 2, 3]
+    assert [
+        record["metrics"]["train/total_tokens_seen"] for record in logger.records[2:]
+    ] == [total + expected_totals[-1] for total in expected_totals]
+    assert [
+        record["metrics"]["train/tokens_per_second"] for record in logger.records[2:]
+    ] == pytest.approx(expected_rates, rel=1e-6, abs=1e-6)
+
+
+def test_throughput_is_zero_when_clock_has_not_advanced(monkeypatch):
+    with torch.random.fork_rng(devices=[]):
+        model = torch.nn.Embedding(2, 2, device="cpu", dtype=torch.float32)
+    logger = MemoryLogger()
+    trainer = Trainer(
+        model=model,
+        loss_fn=torch.nn.CrossEntropyLoss(),
+        optimizer=torch.optim.SGD(model.parameters(), lr=0.1),
+        logger=logger,
+        logging_steps=1,
+        count_tokens=True,
+    )
+    monkeypatch.setattr(time, "perf_counter", lambda: 0.0)
+
+    trainer.train([
+        (torch.ones(4, dtype=torch.int64), torch.zeros(4, dtype=torch.int64))
+    ])
+
+    assert len(logger.records) == 1
+    assert logger.records[0]["metrics"]["train/total_tokens_seen"] == 4
+    rate = logger.records[0]["metrics"]["train/tokens_per_second"]
+    assert isinstance(rate, float)
+    assert rate == 0.0

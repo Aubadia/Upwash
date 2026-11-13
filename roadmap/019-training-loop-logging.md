@@ -2,6 +2,64 @@
 
 ## Status — 2026-11-13
 
+Throughput is implemented in Trainer's interval and final-partial events.
+`time.perf_counter()` timing is enabled only with token counting and logging.
+Each interval accumulates its own token count; tokens/time reset after metric
+emission. The endpoint is captured after each update/count, so final-partial
+timing excludes iterator-exhaustion work. Separate training calls start fresh
+timing while preserving the lifetime token total. Nonpositive elapsed time
+emits `0.0` rather than dividing by zero. No public API changes were needed.
+
+- Original deterministic logging suite after implementation:
+  `./test.sh tests/integration/test_training_logging.py` → exit 0,
+  `15 passed in 1.49s`; the previous missing-throughput Red is Green.
+- Expanded deterministic suite: same command → exit 0,
+  `18 passed in 1.61s`.
+- Full `./test.sh` → exit 0, `117 passed in 1.47s`.
+
+Coverage includes mixed/all padding, default/explicit disabled counting,
+100-second logger delays, 50-second iterator-exhaustion delays, repeated
+training with a 500-second gap and intervening evaluation, and a stationary
+clock. Real autograd/SGD updates are retained. Additional cases passed on
+first execution; no Red is claimed for those assertions.
+
+Next: agree on automatic evaluation inputs and scheduling, then add
+`eval/loss` and `eval/perplexity` emission for the LM scope. GPU synchronization,
+distributed rates, reentrant evaluation during a training iteration, and remote
+delivery remain unverified. Dependencies/configuration were unchanged.
+Earlier records below are historical.
+
+Throughput definition is agreed. `train/tokens_per_second` uses the existing `count_tokens=True` switch
+and divides each logging interval's non-padding input-token count by elapsed
+`time.perf_counter()` seconds. Include data iteration and training computation;
+exclude logger calls, evaluation, and gaps between separate training calls.
+Emit for complete and final-partial intervals alongside existing metrics.
+Start each interval before fetching its first batch and stop after its last
+completed update/count; start the next interval after logging. CPU first;
+GPU synchronization is deferred.
+
+Added `test_throughput_includes_data_loading_and_excludes_logging_time` in
+`tests/integration/test_training_logging.py`. Its fake `time.perf_counter`
+advances 1 second for data loading, 2 for forward, 1 for real backward, and
+1 after real SGD per batch. Each logger call advances another 100 seconds.
+With 8/8/4 tokens and interval 2, events at steps 2/3 must contain Python-float
+rates `16 / 10 = 1.6` and `4 / 5 = 0.8`. The test executes real gradient and
+parameter updates, checks token totals 16/20, and then looks up throughput.
+No real sleeps or assertions about clock call counts are used.
+
+- `./test.sh tests/integration/test_training_logging.py` → exit 1,
+  `1 failed, 14 passed in 1.40s`.
+- `./test.sh` → exit 1, `1 failed, 113 passed in 1.41s`.
+
+Intended Red: `KeyError: 'train/tokens_per_second'`. Updates, event steps, and
+token-total assertions pass; rate assertions have not executed. This is a
+missing metric, not a clock/environment failure. Only tests/docs changed.
+Next: measure each interval with `time.perf_counter`, reset interval tokens
+and time after logging, and include throughput in both event paths. Then
+verify Green. Padding rates, disabled-count emission, repeated-call timing,
+evaluation exclusion, iterator exhaustion timing, zero elapsed time, and GPU
+synchronization remain unverified by this first case. Earlier results follow.
+
 Token counting is implemented and verified Green. Builder forwards
 `count_tokens=False` and `pad_token_id=None` to Trainer. When enabled, the
 counter adds `inputs.numel()` without padding, or a vectorized non-padding

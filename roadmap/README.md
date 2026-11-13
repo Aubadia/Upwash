@@ -5,6 +5,32 @@ Last updated: 2026-11-13 (Asia/Taipei).
 ## Resume Here
 
 Current priority: [019 — Training Loop Logging](019-training-loop-logging.md).
+Throughput is implemented in both event paths. Interval tokens/time reset
+after logging and at the start of each training call; final-partial timing
+uses the last update's timestamp. Deterministic CPU cases verify padding,
+all-padding rates, loading/forward/backward/SGD inclusion, logger/exhaustion
+delay exclusion, repeated calls, evaluation gaps, and zero elapsed time.
+Default/explicit disabled counting omits throughput.
+`./test.sh tests/integration/test_training_logging.py` → exit 0,
+`18 passed in 1.61s`; full `./test.sh` → exit 0, `117 passed in 1.47s`.
+The original throughput case is Green. Next: agree on automatic evaluation
+inputs and scheduling before adding eval/loss and eval/perplexity emission.
+GPU/distributed timing and remote delivery remain unverified.
+Earlier records below are historical.
+
+Throughput timing is agreed: use existing `count_tokens=True`
+to emit interval non-padding tokens per elapsed second, including data loading
+and training computation, excluding logging, evaluation, and gaps between
+training calls. Complete/final-partial intervals use `time.perf_counter`.
+Added a deterministic CPU test: batches cost 5 seconds each (1 loading,
+2 forward, 1 backward, 1 SGD), logger calls cost 100 seconds. For 8/8/4 tokens,
+expected interval rates are 1.6/0.8 at steps 2/3. Training/update/count checks
+pass, then lookup raises `KeyError: 'train/tokens_per_second'`.
+Targeted logging tests → `1 failed, 14 passed in 1.40s`;
+full `./test.sh` → `1 failed, 113 passed in 1.41s` (both exit 1).
+Only tests/docs changed. Next: implement interval timing and emit throughput
+in both logging paths, then verify Green. Remaining timing cases are in 019.
+
 Token counting is implemented in Builder and Trainer with defaults
 `count_tokens=False`, `pad_token_id=None`. Enabled counting sums input tokens
 across training calls, excludes configured padding ids and evaluation, and

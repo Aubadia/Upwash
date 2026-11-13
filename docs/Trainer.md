@@ -94,8 +94,25 @@ events include `train/total_tokens_seen` as a Python integer. Omitted or false
 `count_tokens` preserves generic training without token metrics. Padding
 exclusion changes this metric only; the supplied loss controls loss masking.
 Log steps retain their existing per-call semantics. These CPU behaviors are
-verified; throughput timing, GPU/distributed counting, and checkpoint
+verified; GPU/distributed counting and checkpoint
 persistence of the counter are not established.
+
+## Throughput Logging
+
+With token counting and interval logging enabled, `train/tokens_per_second`
+reports each interval's non-padding input tokens divided by elapsed
+`time.perf_counter()` seconds. Timing starts before fetching the first batch
+and stops after the final update and token count in that interval. Data loading,
+forward, backward, and optimizer work are included; metric emission is excluded.
+The next interval starts after logging. A final partial interval uses the last
+update's timestamp, excluding the time spent discovering iterator exhaustion.
+
+Each `train()` call starts fresh interval tokens and timing, while
+`train/total_tokens_seen` continues accumulating. Evaluation and gaps between
+training calls do not affect the next interval's rate. Zero elapsed time emits
+`0.0`; all-padding intervals also emit `0.0`. Disabling token counting omits
+throughput. These behaviors are verified with a simulated clock and real CPU
+training; GPU synchronization and distributed throughput remain unverified.
 
 ## References
 

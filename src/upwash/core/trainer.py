@@ -1,3 +1,5 @@
+import time
+
 import torch
 
 from upwash.core.state import TrainingState
@@ -39,6 +41,10 @@ class Trainer:
         logging_enabled = self.logger is not None and self.logging_steps is not None
         interval_loss = 0.0
         interval_steps = 0
+        throughput_enabled = logging_enabled and self.count_tokens
+        interval_tokens = 0
+        if throughput_enabled:
+            interval_start = time.perf_counter()
         
         for input, target in batches:
             self.optimizer.zero_grad()
@@ -56,13 +62,16 @@ class Trainer:
                 
             self.optimizer.step()
             steps = steps + 1
+
             if self.count_tokens:
                 if self.pad_token_id is None:
-                    self._total_tokens_seen += input.numel()
+                    batch_tokens = input.numel()
                 else:
-                    self._total_tokens_seen += torch.count_nonzero(
-                        input != self.pad_token_id
-                    )
+                    batch_tokens = torch.count_nonzero(input != self.pad_token_id)
+                self._total_tokens_seen += batch_tokens
+                if throughput_enabled:
+                    interval_tokens += batch_tokens
+                    interval_end = time.perf_counter()
 
             if logging_enabled:
                 interval_loss += loss.detach()
@@ -75,12 +84,19 @@ class Trainer:
                     }
                     if self.count_tokens:
                         metrics["train/total_tokens_seen"] = int(self._total_tokens_seen)
+                        duration = interval_end - interval_start
+                        metrics["train/tokens_per_second"] = (
+                            float(interval_tokens) / duration if duration > 0 else 0.0
+                        )
                     self.logger.log(
                         metrics,
                         step=steps,
                     )
                     interval_loss = 0.0
                     interval_steps = 0
+                    if throughput_enabled:
+                        interval_tokens = 0
+                        interval_start = time.perf_counter()
 
         if steps == 0:
             raise ValueError("batches cannot be empty")
@@ -96,6 +112,10 @@ class Trainer:
             }
             if self.count_tokens:
                 metrics["train/total_tokens_seen"] = int(self._total_tokens_seen)
+                duration = interval_end - interval_start
+                metrics["train/tokens_per_second"] = (
+                    float(interval_tokens) / duration if duration > 0 else 0.0
+                )
             self.logger.log(
                 metrics,
                 step=steps,
