@@ -21,20 +21,25 @@ LM perplexity opt-in before writing its first test. External scoring units,
 grant counts, and the official final configuration remain clarification items
 before launching the affected runs.
 
-## Resume Here — 2026-11-14
+## Resume Here — 2026-11-14 09:40
 
-Current task: [026 — Runnable Sweep Entry](026-run-entry-ddp.md), on branch
-`feat/run-entry` (not committed). At the user's explicit request, the agent
-implemented production code. It adds a CLI with JSON configs, DDP,
-accumulation, clipping, per-group LR, a full wandb config, export with α
-folding, a sample-level shuffle, the pool script, and `scripts/train.sbatch`.
-CPU verification: `386 passed`, plus a 2-rank `torchrun` end-to-end export.
-Nothing has run on GPU yet. Next:
+Current task: [027 — 150M Sweep, S1–S3](027-sweep-150m.md). It ran on the
+entry point from [026](026-run-entry-ddp.md), which the agent wrote.
 
-1. The user reviews the change.
-2. Submit `CONFIG=configs/smoke-150m.json sbatch -J smoke scripts/train.sbatch`
-   and read tok/s and memory.
-3. Decide where to run `prepare_pretrain.py`.
+Branch policy (user, 2026-11-14): `feat/run-entry` was renamed to
+`experiment`. Experiments keep going on that branch with agent-written code.
+Anything the final runs actually depend on is rewritten by hand on `main`
+under the TDD workflow. The `experiment` branch is not meant to be merged as
+is. The sweep snapshot (driver, results, curve reader) is in
+`experiments/sweep150m/`.
+
+S1–S3 finished with 30 runs on the 205B pool at 3B tokens each. Best so far:
+lr 0.004, Muon beta 0.9, AdamW beta1 0.9, beta2 0.99, multiplier 1.6, with
+eval/loss 2.9356. Seed noise is about 0.003. The LR has a cliff between
+0.004 and 0.008. Next, the user decides:
+
+1. Whether to refine the LR near the cliff, and whether to test beta2 0.995.
+2. Whether to run S4–S7: warmup, decay ratio, decay shape, weight decay.
 
 ## Nano4 Setup (2026-11-14)
 

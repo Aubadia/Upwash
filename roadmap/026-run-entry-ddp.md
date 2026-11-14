@@ -5,7 +5,9 @@
 Short on time, the user explicitly asked the agent to write the production code
 needed to run experiments ("有辦法實驗的部分你先幫我 vibe 一下"). This task is
 therefore agent-implemented, on branch `feat/run-entry` from `main` at
-`1faf6dc`. Not committed. The user should review it before merging.
+`1faf6dc`. That branch was renamed `experiment` on 2026-11-14. It stays the
+experiment branch; anything the final runs need is rewritten by hand on
+`main`.
 
 ## Behavior Added
 
@@ -154,6 +156,19 @@ accumulation for now: "minibatch 先不用".
 - Not measured: throughput at batch 4 per GPU. Smoke job 773184 used 16 per
   rank (micro 8).
 - Full suite: `376 passed in 125.89s`.
+
+## Commits — 2026-11-14
+
+The user approved local commits on `feat/run-entry`. Nothing was pushed or
+merged. Six feature-scoped commits on top of `1faf6dc`: `42abd57` (clipping,
+per-group LR, global tokens), `1ab9e2d` (export, `use_cache`), `37743a9`
+(JSON config, shuffle, `RankShard`), `105cf33` (CLI/DDP/wandb
+config/export, sbatch, configs), `94a509d` (pool script), and `05b3458`
+(docs).
+
+Each of the first five was checked in its own detached worktree with
+`./test.sh -q`. No failures were reported: every output ended on a progress
+line with no FAILURES section. The final tree had `376 passed`.
 
 ## Pool Job
 
