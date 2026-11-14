@@ -21,6 +21,96 @@ LM perplexity opt-in before writing its first test. External scoring units,
 grant counts, and the official final configuration remain clarification items
 before launching the affected runs.
 
+## Resume Here — 2026-11-14 09:40
+
+Current task: [027 — 150M Sweep, S1–S3](027-sweep-150m.md). It ran on the
+entry point from [026](026-run-entry-ddp.md), which the agent wrote.
+
+Branch policy (user, 2026-11-14): `feat/run-entry` was renamed to
+`experiment`. Experiments keep going on that branch with agent-written code.
+Anything the final runs actually depend on is rewritten by hand on `main`
+under the TDD workflow. The `experiment` branch is not meant to be merged as
+is. The sweep snapshot (driver, results, curve reader) is in
+`experiments/sweep150m/`.
+
+S1–S3 finished with 30 runs on the 205B pool at 3B tokens each. Best so far:
+lr 0.004, Muon beta 0.9, AdamW beta1 0.9, beta2 0.99, multiplier 1.6, with
+eval/loss 2.9356. Seed noise is about 0.003. The LR has a cliff between
+0.004 and 0.008. Next, the user decides:
+
+1. Whether to refine the LR near the cliff, and whether to test beta2 0.995.
+2. Whether to run S4–S7: warmup, decay ratio, decay shape, weight decay.
+
+## Nano4 Setup (2026-11-14)
+
+- Environment: `.venv` created on nano4 login node `25a-lgn01` with
+  `UV_CACHE_DIR=/work/u7725908/uv-cache UV_PYTHON_INSTALL_DIR=/work/u7725908/uv-python uv sync --frozen`
+  (keep caches off `/home`, which has ~18G free). Python 3.14.7,
+  torch 2.15.0+cu132 (CUDA 13.2) works on driver 580.65 (CUDA 13.0) with the
+  login node's H100 NVL. `./test.sh` → `324 passed in 97.21s`. Not yet run on
+  an H200 compute node.
+- Dev data: `HF_HOME=/work/u7725908/hf-cache PYTHONPATH=src .venv/bin/python scripts/prepare_dev.py`
+  → `{'num_files': 1, 'num_docs': 5000, 'num_excluded': 0, 'num_tokens': 5360078}`
+  in `.cache/dev-tokens/data/validation-00000-of-00001.bin` (uint32, 21 MB).
+  Checked: 5000 BOS (128000) and 5000 EOS (128001), starts with BOS, ends with
+  EOS, max id 128001. At `seq_len=4096`, `PackedTokenDataset` yields 1308
+  samples and drops the final 2509 tokens; samples cross document boundaries.
+- Flock tooling: installed as a separate checkout, not an Upwash dependency.
+  Its sub-packages are `package = false` dependency lists and the root `flock`
+  wheel declares no dependencies, so `uv add` into Upwash would require
+  hand-maintaining Flock's dependency set. Checkout `/work/u7725908/flock` at
+  `45944de386162a75af59ede76a5b436a5981ea58` (2026-11-13), installed with
+  `uv sync --all-packages --locked` (same `/work` uv caches). Run as
+  `uv run --project /work/u7725908/flock flock ...`. `flock --help` works;
+  `flock whoami` → not logged in (login needs interactive browser approval).
+  The `SSL_CERT_DIR` warning comes from one unreadable system cert file.
+- Training data: the pair plans to use Flock's pre-tokenized FineWeb-Edu.
+  Both live in S3 bucket `scaling-llama-3-2` (endpoint
+  `https://s3.flock.cerulean.works`, read via
+  `eval "$(flock s3 credentials --read-only --ttl 1h)"` + `pyarrow.fs.S3FileSystem`;
+  no aws CLI/boto3 installed). Inspected 2026-11-14; probe copies in
+  `/work/u7725908/flock-data-probe/`.
+  - `fineweb-edu-llama3-shuffled-151b/` (recommended): `metadata.json` says
+    tokenizer `meta-llama/Llama-3.2-1B`, source `s3://flock-datasets/fineweb-edu`
+    v1, dev set `cerulean-works/fineweb-edu-dev`, format
+    `[BOS, text, EOS] int32 tokens.npy + int64 offsets.npy, globally shuffled
+    into buckets`, seed 0. 3020 bucket dirs `000000/…`, all complete;
+    604.2 GB of `tokens.npy`, 151,049,225,365 tokens (matches manifest).
+  - `fineweb-edu-llama3/` (unshuffled, same 151.05B source): 2405 dirs versus
+    2403 manifest shards; `020282/` holds only `tokens.npy` and
+    `offsets.npy.tmp`. Not recommended.
+  - Bucket `000000` checks: int32, 48,763,502 tokens, 49,462 docs; offsets are
+    document starts plus the end; every doc is BOS…EOS; max id 128001.
+    50 random docs decode→re-encode identically with the pinned Llama 3.2
+    tokenizer. 0 of 49,462 docs exactly match any of the 5000 local dev docs
+    (token-sequence hash). One bucket is too small a sample to establish
+    exclusion; repeat the check over every downloaded bucket.
+  - Existing loader works unchanged:
+    `DataConfig(root=<dir>, pattern="*/tokens.npy", format="npy", seq_len=4096, num_tokens=N)`
+    → int64 `[4096]` inputs starting with BOS, targets shifted by one.
+  - Provenance (user, 2026-11-14): both `scaling-llama-3-2` copies were
+    tokenized and uploaded by another pair; they are not organizer data.
+  - Official source: Flock dataset `cerulean-labs/fineweb-edu`
+    = Lance `s3://flock-datasets/fineweb-edu` version 1 (only version), from
+    `HuggingFaceFW/fineweb-edu` revision `87f09149ef4734204d70ed1d046ddc9ca3f2b8f9`.
+    Raw text with `id`, `dump`, `token_count` (GPT-2) and other columns;
+    1,525,223,056 rows in 24,491 fragments. Fragment 1234 sample (20,000 docs):
+    Llama 3.2 tokens / GPT-2 `token_count` = 0.963; extrapolated ~1.57T Llama
+    tokens in total. Single-thread `encode_batch` ≈ 0.65M tok/s, so ~200B
+    tokens ≈ 90 core-hours.
+  - CPU partitions `ngs8g`/`ngs32g`/`ngs62g`/`ngs248c` reject account
+    ACD115198 (`sbatch --test-only`: invalid account/partition).
+  - Agreed (2026-11-14): build one shared ~205B-token pool from the official
+    source, excluding dev ids; shuffle by randomly selecting fragments across
+    dumps, then shuffling documents at shard level, with a recorded seed.
+    Each run takes a prefix of the pool. Open: `pylance` dependency versus HF
+    parquet through the existing `prepare_token_shards`; BOS convention.
+  - Budget gap: 151.05B < 200B. A 200B config raises
+    `ValueError: num_samples must be in [...]` from `Truncate`, so the final
+    run needs an agreed repeat (about 1.32 passes) or another source.
+  Before use, verify its tokenizer, BOS/EOS convention, dtype/format, and
+  exclusion of the 5000 dev documents.
+
 ## Resume Here
 
 Current task (2026-11-14): [025 — Option-B initialization for the HF Llama](025-llama-initialization.md), on branch `feat/llama-init` (PR #12) from `main` at `be696b0`.

@@ -154,7 +154,23 @@ def test_train_logs_metrics_and_finishes_its_flock_run(
         result = entry.train(config)
 
     assert result.state.global_step == 3
-    assert recording_sdk.settings == [dict(project="test-project", name="test-run", config={})]
+    assert len(recording_sdk.settings) == 1
+    settings = recording_sdk.settings[0]
+    assert (settings["project"], settings["name"]) == ("test-project", "test-run")
+    # The lab requires model, initialization, optimizer, batch size, schedule and duration.
+    logged = settings["config"]
+    # Only the lab's categories plus provenance; no runtime plumbing such as device or paths of outputs.
+    assert set(logged) == {
+        "model", "initialization", "optimizer", "batch", "schedule", "duration", "data", "seed", "git_commit",
+    }
+    assert logged["model"] == {**config.model.to_dict(), "num_parameters": config.model.num_parameters()}
+    assert logged["initialization"]["embedding_std"] == config.model.embedding_std
+    assert logged["initialization"]["output_multiplier"] == pytest.approx(1.0 / 4 / 0.1)
+    assert {k: logged["optimizer"][k] for k in config.training.optimizer.to_dict()} == config.training.optimizer.to_dict()
+    assert logged["schedule"] == config.schedule.to_dict()
+    assert logged["batch"]["global_batch_size"] == config.batch_size
+    assert logged["batch"]["global_batch_tokens"] == config.batch_size * 4
+    assert logged["duration"] == {"total_steps": 3, "train_tokens": 20, "seq_len": 4, "eval_steps": 2}
     assert recording_sdk.finished == 1
     assert [step for _, step, _ in recording_sdk.events] == [2, 3]
     assert [metrics["train/total_tokens_seen"] for metrics, _, _ in recording_sdk.events] == [16, 20]

@@ -30,6 +30,8 @@ def config_adaptor(config: ModelConfig) -> LlamaConfig:
         attention_bias=False,
         mlp_bias=False,
         attention_dropout=0.0,
+        # Training never reuses past key/values; a cache would only hold memory.
+        use_cache=False,
     )
 
 def output_multiplier(config: ModelConfig) -> float:
@@ -51,3 +53,22 @@ def build_llama_model(config: ModelConfig) -> LlamaForCausalLM:
     hook = functools.partial(_scale_output, alpha=output_multiplier(config))
     model.lm_head.register_forward_hook(hook)
     return model
+
+
+def export_hf_model(model, config: ModelConfig, *, max_position_embeddings=None) -> LlamaForCausalLM:
+    """Return a hook-free HF Llama whose logits equal the trained model's.
+
+    The trained model applies alpha through a forward hook, which `save_pretrained`
+    does not keep. With tied embeddings alpha cannot go into lm_head, so it is folded
+    into the final RMSNorm weight, which feeds only lm_head:
+    lm_head(alpha * norm(h)) == alpha * lm_head(norm(h)).
+    A fresh model is built so the trained model keeps its hook and weights.
+    """
+    llama_config = config_adaptor(config)
+    if max_position_embeddings is not None:
+        llama_config.max_position_embeddings = max_position_embeddings
+    exported = LlamaForCausalLM(llama_config)
+    exported.load_state_dict(model.state_dict())
+    with torch.no_grad():
+        exported.model.norm.weight.mul_(output_multiplier(config))
+    return exported.to(next(model.parameters()).device)
