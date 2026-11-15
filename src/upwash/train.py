@@ -5,9 +5,12 @@ One node, 8 GPUs: torchrun --standalone --nproc_per_node 8 -m upwash.train --con
 """
 
 import argparse
+import hashlib
 import os
 import subprocess
+import traceback
 from dataclasses import dataclass
+from contextlib import nullcontext
 from functools import partial
 from pathlib import Path
 
@@ -71,6 +74,15 @@ def _git_commit():
         return None
 
 
+def _source_hash():
+    digest = hashlib.sha256()
+    root = Path(__file__).resolve().parent
+    for path in sorted(root.rglob("*.py")):
+        digest.update(str(path.relative_to(root)).encode())
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
 def run_metadata(config: RunConfig, runtime: _Runtime, total_steps: int) -> dict:
     """The wandb config: what the lab requires, plus provenance.
 
@@ -91,6 +103,9 @@ def run_metadata(config: RunConfig, runtime: _Runtime, total_steps: int) -> dict
             **config.training.optimizer.to_dict(),
             "max_grad_norm": config.training.max_grad_norm,
             "precision": config.training.precision,
+            "attention_implementation": config.attention_implementation,
+            "compile_model": config.compile_model,
+            "compile_mode": config.compile_mode,
         },
         "batch": {
             "global_batch_size": global_batch,
@@ -112,6 +127,7 @@ def run_metadata(config: RunConfig, runtime: _Runtime, total_steps: int) -> dict
         },
         "seed": config.seed,
         "git_commit": _git_commit(),
+        "source_sha256": _source_hash(),
     }
 
 
@@ -139,6 +155,8 @@ def train(config: RunConfig) -> TrainResult:
     # The same seed on every rank gives identical initial weights; DDP also
     # broadcasts rank 0's weights when wrapping.
     model = build_llama_model(config.model).to(runtime.device)
+    if config.attention_implementation is not None:
+        model.set_attn_implementation(config.attention_implementation)
     trained = model
     if runtime.world_size > 1:
         # Rotary buffers are constants (synced once at init), and evaluation runs
@@ -149,6 +167,9 @@ def train(config: RunConfig) -> TrainResult:
             device_ids=[torch.device(runtime.device).index] if runtime.device.startswith("cuda") else None,
             forward_sync_buffers=False,
         )
+
+    if config.compile_model:
+        trained = torch.compile(trained, backend="inductor", mode=config.compile_mode)
 
     # Load the tokenizer before training so a missing offline cache fails now,
     # not after the run when the export is written.
@@ -183,12 +204,24 @@ def train(config: RunConfig) -> TrainResult:
             eval_perplexity=True,
             world_size=runtime.world_size,
         )
-        state = trainer.train(train_loader, eval_batches=eval_loader)
+        # Six attention layers, train/eval modes, and the dev tail need more
+        # than Dynamo's default eight guarded variants. Never silently go eager.
+        compile_settings = (
+            torch._dynamo.config.patch(recompile_limit=64, fail_on_recompile_limit_hit=True)
+            if config.compile_model else nullcontext()
+        )
+        with compile_settings:
+            state = trainer.train(train_loader, eval_batches=eval_loader)
         if config.output_dir is not None and runtime.is_main:
             save_model(model, config, tokenizer=tokenizer)
         if runtime.world_size > 1:
             dist.barrier()
         return TrainResult(model=model, state=state)
+    except BaseException:
+        # NCCL teardown can wait for peers still compiling or inside collectives.
+        # Emit the original exception before cleanup so failed ranks are diagnosable.
+        traceback.print_exc()
+        raise
     finally:
         if logger is not None:
             # logger can automatically handle this, but add additional protection for safe

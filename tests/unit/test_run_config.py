@@ -33,7 +33,8 @@ def make_config(make_optimizer_config, **overrides):
 
 
 def test_run_config_round_trips_through_json(tmp_path, make_optimizer_config):
-    config = make_config(make_optimizer_config)
+    config = make_config(make_optimizer_config, attention_implementation="flash_attention_3", compile_model=True)
+    config.model.residual_scale_by_depth = True
     path = tmp_path / "run.json"
     path.write_text(json.dumps(config.to_dict()))
 

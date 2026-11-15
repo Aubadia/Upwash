@@ -1,0 +1,57 @@
+{
+  "case": "compiled-loss",
+  "world_size": 8,
+  "local_batch": 4,
+  "global_batch": 32,
+  "windows": [
+    {
+      "seconds": 5.52586629986763,
+      "step_ms": 55.2586629986763,
+      "tokens_per_second": 2371971.9748402126,
+      "loss": 7.23562744140625
+    },
+    {
+      "seconds": 5.550661616027355,
+      "step_ms": 55.50661616027355,
+      "tokens_per_second": 2361376.157781513,
+      "loss": 6.001044921875
+    },
+    {
+      "seconds": 5.559492328204215,
+      "step_ms": 55.594923282042146,
+      "tokens_per_second": 2357625.341707017,
+      "loss": 5.447890014648437
+    }
+  ],
+  "peak_allocated_bytes": 14242378240.0,
+  "peak_reserved_bytes": 17699962880.0,
+  "median_tokens_per_second": 2361376.157781513,
+  "gpu_hours_per_billion_tokens": 0.9410708306252976,
+  "warmup_and_compile_seconds": 14.421884758397937,
+  "options": {
+    "config": "configs/base150m/base150m-30b-seed2-am1.6.json",
+    "name": "compiled-loss",
+    "output": "/work/asciibase64/upwash/speed150m/778734/compiled-loss.json",
+    "mode": "default",
+    "scope": "objective",
+    "fused_loss": false,
+    "eager_fused_loss": false,
+    "fused_adam": false,
+    "compile_optimizer": false,
+    "prefetch": false,
+    "profile": false,
+    "numerics": false,
+    "global_batch": 32,
+    "warmup": 40,
+    "steps": 100,
+    "windows": 3
+  },
+  "versions": {
+    "torch": "2.15.0",
+    "transformers": "5.22.2",
+    "triton": "3.9.0"
+  },
+  "job_id": "778734",
+  "node": "25a-hgpn061",
+  "source_sha256": "9673bf5912dd729aa12c81c42f1fe28b00c1715e382205e4b23b6d5511f5e877"
+}

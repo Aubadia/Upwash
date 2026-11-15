@@ -161,7 +161,7 @@ def test_train_logs_metrics_and_finishes_its_flock_run(
     logged = settings["config"]
     # Only the lab's categories plus provenance; no runtime plumbing such as device or paths of outputs.
     assert set(logged) == {
-        "model", "initialization", "optimizer", "batch", "schedule", "duration", "data", "seed", "git_commit",
+        "model", "initialization", "optimizer", "batch", "schedule", "duration", "data", "seed", "git_commit", "source_sha256",
     }
     assert logged["model"] == {**config.model.to_dict(), "num_parameters": config.model.num_parameters()}
     assert logged["initialization"]["embedding_std"] == config.model.embedding_std

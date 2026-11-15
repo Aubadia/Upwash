@@ -1,0 +1,56 @@
+{
+  "case": "native-reduce-overhead",
+  "world_size": 4,
+  "local_batch": 8,
+  "global_batch": 32,
+  "windows": [
+    {
+      "seconds": 9.329689600970596,
+      "step_ms": 93.29689600970596,
+      "tokens_per_second": 1404891.3265706522,
+      "loss": 7.2384423828125
+    },
+    {
+      "seconds": 9.388412599917501,
+      "step_ms": 93.88412599917501,
+      "tokens_per_second": 1396103.95905642,
+      "loss": 6.004774780273437
+    },
+    {
+      "seconds": 9.427530189044774,
+      "step_ms": 94.27530189044774,
+      "tokens_per_second": 1390311.1140636997,
+      "loss": 5.443836669921875
+    }
+  ],
+  "peak_allocated_bytes": 2982581760.0,
+  "peak_reserved_bytes": 35825647616.0,
+  "median_tokens_per_second": 1396103.95905642,
+  "gpu_hours_per_billion_tokens": 0.795865597188102,
+  "warmup_and_compile_seconds": 14.652109916787595,
+  "options": {
+    "config": "configs/base150m/base150m-30b-seed2-am1.6.json",
+    "name": "native-reduce-overhead",
+    "output": "/work/asciibase64/upwash/speed150m/778509/native-reduce-overhead.json",
+    "mode": "reduce-overhead",
+    "scope": "objective",
+    "fused_loss": false,
+    "fused_adam": true,
+    "compile_optimizer": false,
+    "prefetch": true,
+    "profile": false,
+    "numerics": false,
+    "global_batch": 32,
+    "warmup": 40,
+    "steps": 100,
+    "windows": 3
+  },
+  "versions": {
+    "torch": "2.15.0",
+    "transformers": "5.22.2",
+    "triton": "3.9.0"
+  },
+  "job_id": "778509",
+  "node": "25a-hgpn004",
+  "source_sha256": "a1e9c262a204a1aff7073becb079e9647da296c7bf312ae43a944725c8000c93"
+}

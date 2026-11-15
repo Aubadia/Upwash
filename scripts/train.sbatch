@@ -39,10 +39,17 @@ export WANDB_BASE_URL=${WANDB_BASE_URL:-https://flock-api.cerulean.works}
 export WANDB_MODE=${WANDB_MODE:-online}   # offline + `wandb sync` later if nodes cannot reach Flock
 export WANDB_DIR=${WANDB_DIR:-/work/$USER/upwash/wandb}
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-8}
+export TORCHINDUCTOR_CACHE_DIR=${TORCHINDUCTOR_CACHE_DIR:-/work/$USER/upwash/cache/inductor}
+export TRITON_CACHE_DIR=${TRITON_CACHE_DIR:-/work/$USER/upwash/cache/triton}
+export CUDA_HOME=${CUDA_HOME:-/usr/local/cuda-13.0}
+export PATH="$CUDA_HOME/bin:$PATH"
 # Single node: bootstrap NCCL over loopback; some nodes' IPoIB addresses are not
 # routable even locally (lab5). GPU traffic still goes over NVLink.
 export NCCL_SOCKET_IFNAME=${NCCL_IFNAME:-lo}
-mkdir -p "$WANDB_DIR" "$(dirname "$OUT")"
+mkdir -p "$WANDB_DIR" "$OUT" "$TORCHINDUCTOR_CACHE_DIR" "$TRITON_CACHE_DIR"
+cp "$CONFIG" "$OUT/run-config.json"
+git diff -- src scripts > "$OUT/source.diff"
+git rev-parse HEAD > "$OUT/git-commit.txt"
 
 log "run=$RUN config=$CONFIG out=$OUT commit=$(git rev-parse --short HEAD) node=$(hostname)"
 if ! nvidia-smi --query-gpu=name,memory.total --format=csv,noheader; then
@@ -55,7 +62,7 @@ if [[ "$NGPU" -ne "${SLURM_GPUS_ON_NODE:-$NGPU}" ]]; then
     exit 1
 fi
 
-.venv/bin/torchrun --standalone --nproc_per_node "$NGPU" -m upwash.train \
+.venv/bin/torchrun --standalone --nproc_per_node "$NGPU" --no-python scripts/train_rank.sh \
     --config "$CONFIG" --name "$RUN" --output-dir "$OUT"
 
 log "done: $OUT"

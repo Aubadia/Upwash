@@ -1,0 +1,7 @@
+# Install into the existing pinned Torch/Transformers environment without resolving them again.
+# Source build flags and CUDA toolkit are recorded in scripts/build_fa3.sbatch.
+wheel==0.48.0
+ninja==1.13.2
+psutil==7.2.2
+einops==0.8.2
+flash-attn-3 @ git+https://github.com/Dao-AILab/flash-attention.git@f63c472c4dc19237c0635d6a629df065ff64796e#subdirectory=hopper

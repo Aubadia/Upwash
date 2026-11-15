@@ -1,0 +1,57 @@
+{
+  "case": "baseline",
+  "world_size": 8,
+  "local_batch": 4,
+  "global_batch": 32,
+  "windows": [
+    {
+      "seconds": 12.607224778272212,
+      "step_ms": 126.07224778272212,
+      "tokens_per_second": 1039657.833545529,
+      "loss": 7.238006591796875
+    },
+    {
+      "seconds": 11.749320698902011,
+      "step_ms": 117.49320698902011,
+      "tokens_per_second": 1115570.8773210084,
+      "loss": 6.003818359375
+    },
+    {
+      "seconds": 10.820482383482158,
+      "step_ms": 108.20482383482158,
+      "tokens_per_second": 1211332.3173104182,
+      "loss": 5.450311279296875
+    }
+  ],
+  "peak_allocated_bytes": 26896587264.0,
+  "peak_reserved_bytes": 38726008832.0,
+  "median_tokens_per_second": 1115570.8773210084,
+  "gpu_hours_per_billion_tokens": 1.9920045130245652,
+  "warmup_and_compile_seconds": 26.50701859500259,
+  "options": {
+    "config": "configs/base150m/base150m-30b-seed2-am1.6.json",
+    "name": "baseline",
+    "output": "/work/asciibase64/upwash/speed150m/778734/baseline.json",
+    "mode": "default",
+    "scope": "model",
+    "fused_loss": false,
+    "eager_fused_loss": false,
+    "fused_adam": false,
+    "compile_optimizer": false,
+    "prefetch": false,
+    "profile": false,
+    "numerics": false,
+    "global_batch": 32,
+    "warmup": 40,
+    "steps": 100,
+    "windows": 3
+  },
+  "versions": {
+    "torch": "2.15.0",
+    "transformers": "5.22.2",
+    "triton": "3.9.0"
+  },
+  "job_id": "778734",
+  "node": "25a-hgpn061",
+  "source_sha256": "9673bf5912dd729aa12c81c42f1fe28b00c1715e382205e4b23b6d5511f5e877"
+}

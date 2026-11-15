@@ -1,0 +1,56 @@
+{
+  "case": "native-2gpu",
+  "world_size": 2,
+  "local_batch": 16,
+  "global_batch": 32,
+  "windows": [
+    {
+      "seconds": 17.16408988740295,
+      "step_ms": 171.64089887402952,
+      "tokens_per_second": 763640.8388667097,
+      "loss": 7.23653564453125
+    },
+    {
+      "seconds": 17.295403643045574,
+      "step_ms": 172.95403643045574,
+      "tokens_per_second": 757842.9662883504,
+      "loss": 6.001051635742187
+    },
+    {
+      "seconds": 17.332304429728538,
+      "step_ms": 173.32304429728538,
+      "tokens_per_second": 756229.505034449,
+      "loss": 5.44263671875
+    }
+  ],
+  "peak_allocated_bytes": 49645110784.0,
+  "peak_reserved_bytes": 65676509184.0,
+  "median_tokens_per_second": 757842.9662883504,
+  "gpu_hours_per_billion_tokens": 0.7330747665000735,
+  "warmup_and_compile_seconds": 27.097885509952903,
+  "options": {
+    "config": "configs/base150m/base150m-30b-seed2-am1.6.json",
+    "name": "native-2gpu",
+    "output": "/work/asciibase64/upwash/speed150m/778509/native-2gpu.json",
+    "mode": "default",
+    "scope": "objective",
+    "fused_loss": false,
+    "fused_adam": true,
+    "compile_optimizer": false,
+    "prefetch": true,
+    "profile": false,
+    "numerics": false,
+    "global_batch": 32,
+    "warmup": 40,
+    "steps": 100,
+    "windows": 3
+  },
+  "versions": {
+    "torch": "2.15.0",
+    "transformers": "5.22.2",
+    "triton": "3.9.0"
+  },
+  "job_id": "778509",
+  "node": "25a-hgpn004",
+  "source_sha256": "a1e9c262a204a1aff7073becb079e9647da296c7bf312ae43a944725c8000c93"
+}

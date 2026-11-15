@@ -1,0 +1,56 @@
+{
+  "case": "reduce-overhead",
+  "world_size": 4,
+  "local_batch": 8,
+  "global_batch": 32,
+  "windows": [
+    {
+      "seconds": 5.955787625629455,
+      "step_ms": 119.1157525125891,
+      "tokens_per_second": 1100375.0321448648,
+      "loss": 8.601536254882813
+    },
+    {
+      "seconds": 6.01301632868126,
+      "step_ms": 120.2603265736252,
+      "tokens_per_second": 1089902.2456899427,
+      "loss": 7.04119873046875
+    },
+    {
+      "seconds": 6.040416094940156,
+      "step_ms": 120.80832189880311,
+      "tokens_per_second": 1084958.3699192049,
+      "loss": 6.358789672851563
+    }
+  ],
+  "peak_allocated_bytes": 44219661824.0,
+  "peak_reserved_bytes": 84173389824.0,
+  "median_tokens_per_second": 1089902.2456899427,
+  "gpu_hours_per_billion_tokens": 1.0194594198746167,
+  "warmup_and_compile_seconds": 12.78174192365259,
+  "options": {
+    "config": "configs/base150m/base150m-30b-seed2-am1.6.json",
+    "name": "reduce-overhead",
+    "output": "/work/asciibase64/upwash/speed150m/778431/reduce-overhead.json",
+    "mode": "reduce-overhead",
+    "scope": "model",
+    "fused_loss": false,
+    "fused_adam": false,
+    "compile_optimizer": false,
+    "prefetch": false,
+    "profile": false,
+    "numerics": false,
+    "global_batch": 32,
+    "warmup": 20,
+    "steps": 50,
+    "windows": 3
+  },
+  "versions": {
+    "torch": "2.15.0",
+    "transformers": "5.22.2",
+    "triton": "3.9.0"
+  },
+  "job_id": "778431",
+  "node": "25a-hgpn019",
+  "source_sha256": "a1e9c262a204a1aff7073becb079e9647da296c7bf312ae43a944725c8000c93"
+}

@@ -90,6 +90,7 @@ class ModelConfig:
     norm_eps: float
     embedding_std: float
     output_std_coeff: float
+    residual_scale_by_depth: bool = False
 
     def __post_init__(self):
         for name in ("vocab_size", "n_layers", "d_model", "d_ff", "n_heads", "n_kv_heads", "max_seq_len"):
@@ -182,6 +183,9 @@ class RunConfig:
     # Exported config only; default RoPE does not read it, so values > max_seq_len
     # change no logits for inputs <= max_seq_len (Flock fineweb_edu wants >= 8192).
     export_max_position_embeddings: int | None = None
+    attention_implementation: str | None = None
+    compile_model: bool = False
+    compile_mode: str = "default"
 
     def __post_init__(self):
         for name in ("batch_size", "eval_batch_size"):
@@ -208,6 +212,9 @@ class RunConfig:
             "tokenizer": self.tokenizer,
             "tokenizer_revision": self.tokenizer_revision,
             "export_max_position_embeddings": self.export_max_position_embeddings,
+            "attention_implementation": self.attention_implementation,
+            "compile_model": self.compile_model,
+            "compile_mode": self.compile_mode,
         }
 
     @classmethod
