@@ -1,6 +1,99 @@
 # Implementation Progress
 
-Last updated: 2026-11-14 (Asia/Taipei).
+Last updated: 2026-11-15 (Asia/Taipei).
+
+## Training started — 150M decay / 300M LR (2026-11-15 14:08)
+
+The user authorized execution of task 030 and explicitly authorized an isolated
+experimental 300M optimizer-group adapter plus validation. Reuse completed 150M
+power-p1 control **778934** after exact Python-source, numerical-config and
+performance-plan comparison. New 30B jobs **780253** (power p=1.25) and
+**780254** (cosine) are RUNNING on eight GPUs each; online Flock runs are
+`qh7g8hkd` and `79i09kx2`. No final result for either new shape yet.
+
+300M support lives only in `experiments/sweep300m/`; existing production modules
+are unchanged. Independent Torch 2.15.0 reference updates complete before the
+initial missing-adapter Red (3 failures). After implementation, targeted group /
+compiled-update / optimizer / WSD regression: **19 passed in 13.88s**; full CPU
+suite: **390 passed in 20.47s**. No dependencies or test configuration changed.
+Both full-300M numerical and 400-update WSD/dev/export gates pass. Original batch
+**780263** ended FAILED solely because its final checker expected an incorrect
+LR metric name; the corrected checker passes the retained GPU outputs, with
+**7 related CPU tests passing**. No GPU training code changed. Formal 60B jobs
+**780284** (LR label .002) and **780285** (.0025) are now RUNNING, eight GPUs /
+24 h each, on 25a-hgpn044 / 25a-hgpn064. Both retain power p=1; no shape winner
+has been selected. All four new jobs use frozen source snapshots.
+
+See [030](030-300m-sweep-config.md) for snapshots and submission records.
+Startup is verified for all four new jobs: finite losses/gradients, online Flock
+uploads with HTTP 200, and both 300M main/down/Adam LRs matching their scheduled
+manifest values. At verification, 300M .002 reached step 800 / 104.86M tokens;
+.0025 reached step 200 / 26.21M. Flock runs: `h75v28ld` / `vp67ndio`.
+150M jobs reached 2.16B / 2.15B tokens, approximately 2.5M tokens/s each;
+300M measured approximately 1.33M tokens/s. These are startup measurements.
+Next: compare final 150M dev losses and 300M convergence after completion.
+Startup does not establish long-run stability; final results remain pending.
+
+## Configuration delivery — 150M decay / 300M scaled LR (2026-11-15)
+
+[Task 030](030-300m-sweep-config.md) now delivers **five configurations**:
+[three 150M / 30B decay shapes](../experiments/decay150m/README.md) at fixed
+baseline LR .002 (power p=1, p=1.25, cosine), and
+[two 300M / 60B scaled LR proposals](../experiments/sweep300m/README.md) with
+150M-scale labels .002/.0025, currently fixed to baseline power p=1. The four
+former 300M shape variants were removed; there is no LR-by-shape cross product.
+The original 150M baseline remains unchanged. If 150M selects another shape,
+apply it identically to both 300M candidates before execution.
+
+Main Muon API LRs are **.0017320508075688772 / .0021650635094610966**;
+down_proj additionally uses 64/81 relative to the main group, while Adam API
+LRs remain .0032/.004 under the documented tied-weight/norm adaptation. The
+300M proposals still require per-group LR/WD support and are not executable
+RunConfigs. The three 150M files load through the current RunConfig loader.
+Only configurations and related documentation changed; no jobs submitted.
+
+Current regression: optimizer/residual/model/config/WSD command in task 030
+-> exit 0, **79 passed in 21.41s**. Separate read-only validation passed for
+all five files: baseline isolation, actual meta-model counts, exhaustive group
+assignment, installed Torch normalization, LR/WD, distinct run identities and
+token/schedule accounting. This is configuration validation, not 300M GPU
+acceptance. `git diff --check` passes. Full five-run budget is **209,999,495,168 tokens**; reusing the
+completed 150M p1 control after matching settings leaves **179,999,604,736**.
+Next: review the configurations. Later execution requires group support and
+300M GPU acceptance; shape selection remains pending actual 150M results.
+
+Baseline 778934 is now verified COMPLETED (0:0), 228,881 updates /
+29,999,890,432 tokens, final logged dev loss **2.78278**. This supersedes the
+startup-only status below; it does not establish 300M convergence.
+
+## Historical startup — Half LR, 30B (2026-11-15 02:28)
+
+User approved starting the proposed reduced-LR experiment. Job **778934** is
+RUNNING on **25a-hgpn052**, partition `8gpus`, eight GPUs. Muon LR **.002**,
+Adam multiplier 1.6 / AdamW LR **.0032**; seed/data/global batch 32/WSD/token
+budget are unchanged. Uses task 029's accepted default-mode optimized runner.
+Prelaunch config/schedule integration checks: **9 passed in 9.15s**. Source and
+configuration are snapshotted; details in [028](028-base-150m-calibration.md).
+Startup confirmed at step 400 / 52.43M tokens: loss 6.378932, LR .002/.0032,
+finite gradients, 2.46M tokens/s; Flock run `oby75muf` history uploads return
+200 OK. Next: evaluate full-dev metrics and stability beyond the old
+15.57B/20.77B failure points through 30B. No long-run stability result yet.
+
+## Completed — Training speed measurements (2026-11-15)
+
+User authorized measuring and combining five training optimizations; see
+[029](029-training-speed.md). Isolated Liger 0.8.5 installation is separately
+approved and complete. All six screening/refinement/acceptance jobs completed.
+The selected eight-GPU composition reaches **2,561,742 tokens/s (+29.8%)** against
+the matched warm baseline. Max-autotune reaches **2,601,377 (+31.8%)**, but its
+extra compilation cost makes default mode preferable for the current 30B budget.
+Both pass full-150M numerical gates and actual Trainer 400-update WSD/dev/export
+acceptance (778782 / 778783); 387 CPU tests pass. See
+[results and reproduction](../experiments/speed150m/RESULTS.md).
+Eight-GPU work used `8gpus` after verifying dev's partition-specific QOS limits;
+the unrelated Mirage job was left untouched. No formal 30B run was submitted.
+Next: return to task 028's unresolved long-run instability; these short
+benchmarks do not establish convergence.
 
 Merge verification: merged `origin/main` at `5d989c7` into `feat/Adaptor`.
 Resolved the progress-log conflict by retaining both branches' records. Adapted
@@ -20,6 +113,139 @@ adds no API or implementation. Session baseline: `./test.sh` → exit 0,
 LM perplexity opt-in before writing its first test. External scoring units,
 grant counts, and the official final configuration remain clarification items
 before launching the affected runs.
+
+## Current task — 150M base calibration (2026-11-14)
+
+**2026-11-15 follow-up verification:** local histories confirm sustained
+instability in the named 1.6 run (formal job 777067; 777055 is its launcher
+suffix) and the 1.5 run. Both jobs remain CANCELLED. Final available training
+losses are 7.97324 at 22.322B tokens and 6.35320 at 22.138B respectively.
+Current-worktree CPU clipping/optimizer regressions: **9 passed in 29.01s**;
+this is not a reproduction of GPU long-run instability. Root cause remains
+unproven. Proposed next step: agree on replay checkpoints and update diagnostics,
+then a controlled lower-LR 30B run; no new run or settings change was made.
+Detailed command, evidence and proposal are in [028](028-base-150m-calibration.md).
+
+See [028](028-base-150m-calibration.md). **2026-11-15 00:18 update:** at the
+user's request, cancelled jobs **777067** and **777068**. Slurm accounting
+confirms CANCELLED for both. Logs, histories and snapshots are retained;
+neither run completed 30B tokens. No replacement submitted. Next: agree on
+diagnostics and a revised calibration plan before another run.
+
+**Earlier diagnosis, 2026-11-15 00:15:** both
+formal jobs are RUNNING but have sustained loss degradation. Multiplier 1.6
+destabilizes around 15.57B tokens (dev 2.869 -> 6.392 -> 7.885); multiplier
+1.5 around 20.77B (dev 2.857 -> 7.437). LR is unchanged at onset. Clip=1 is
+wired in both actual configs; snapshot CPU clipping/optimizer regressions pass
+(9 tests). Muon normalizes updates, so raw-gradient clipping does not directly
+bound their size. Root cause is unproven and there are no intermediate
+checkpoints for replay. Flock upload errors also require later sync verification;
+local history confirms degradation. No jobs/settings changed. Next: decide
+whether to terminate degraded runs, then agree on diagnostics and a controlled
+LR comparison before replacement runs. Details and limitations are in task 028.
+
+Previous successful preparation and smoke verification (2026-11-14 21:05):
+205.088B-token pool and dev preparation completed. FA3 build and single-GPU
+numerical/profile tests pass. After fixing cache isolation and compiler-limit
+handling, 8-GPU compiled smoke **777055** passed all 240 updates, full dev eval,
+HF export and online Flock sync (run **45up3a2n**), ~1.112M tok/s last interval.
+Two formal 150M/~30B calibration jobs were submitted: **777067** (Adam multiplier
+1.6), **777068** (1.5), seed 2, residual 1/6, FA3 + compile, online Flock.
+Each requests 8 GPUs / 14 h and may serialize under the account GPU limit.
+No final calibration result yet. All GPU execution uses sbatch. No scale-up or
+decay sweep is part of this task. Earlier smoke failures and CPU Red/Green
+checks are recorded in task 028. Runtime state and job mapping are in
+`/work/asciibase64/upwash/base150m-pipeline.json`.
+
+## Resume Here — 2026-11-14 09:40
+
+Current task: [027 — 150M Sweep, S1–S3](027-sweep-150m.md). It ran on the
+entry point from [026](026-run-entry-ddp.md), which the agent wrote.
+
+Branch policy (user, 2026-11-14): `feat/run-entry` was renamed to
+`experiment`. Experiments keep going on that branch with agent-written code.
+Anything the final runs actually depend on is rewritten by hand on `main`
+under the TDD workflow. The `experiment` branch is not meant to be merged as
+is. The sweep snapshot (driver, results, curve reader) is in
+`experiments/sweep150m/`.
+
+S1–S3 finished with 30 runs on the 205B pool at 3B tokens each. Best so far:
+lr 0.004, Muon beta 0.9, AdamW beta1 0.9, beta2 0.99, multiplier 1.6, with
+eval/loss 2.9356. Seed noise is about 0.003. The LR has a cliff between
+0.004 and 0.008. Next, the user decides:
+
+1. Whether to refine the LR near the cliff, and whether to test beta2 0.995.
+2. Whether to run S4–S7: warmup, decay ratio, decay shape, weight decay.
+
+## Nano4 Setup (2026-11-14)
+
+- Environment: `.venv` created on nano4 login node `25a-lgn01` with
+  `UV_CACHE_DIR=/work/u7725908/uv-cache UV_PYTHON_INSTALL_DIR=/work/u7725908/uv-python uv sync --frozen`
+  (keep caches off `/home`, which has ~18G free). Python 3.14.7,
+  torch 2.15.0+cu132 (CUDA 13.2) works on driver 580.65 (CUDA 13.0) with the
+  login node's H100 NVL. `./test.sh` → `324 passed in 97.21s`. Not yet run on
+  an H200 compute node.
+- Dev data: `HF_HOME=/work/u7725908/hf-cache PYTHONPATH=src .venv/bin/python scripts/prepare_dev.py`
+  → `{'num_files': 1, 'num_docs': 5000, 'num_excluded': 0, 'num_tokens': 5360078}`
+  in `.cache/dev-tokens/data/validation-00000-of-00001.bin` (uint32, 21 MB).
+  Checked: 5000 BOS (128000) and 5000 EOS (128001), starts with BOS, ends with
+  EOS, max id 128001. At `seq_len=4096`, `PackedTokenDataset` yields 1308
+  samples and drops the final 2509 tokens; samples cross document boundaries.
+- Flock tooling: installed as a separate checkout, not an Upwash dependency.
+  Its sub-packages are `package = false` dependency lists and the root `flock`
+  wheel declares no dependencies, so `uv add` into Upwash would require
+  hand-maintaining Flock's dependency set. Checkout `/work/u7725908/flock` at
+  `45944de386162a75af59ede76a5b436a5981ea58` (2026-11-13), installed with
+  `uv sync --all-packages --locked` (same `/work` uv caches). Run as
+  `uv run --project /work/u7725908/flock flock ...`. `flock --help` works;
+  `flock whoami` → not logged in (login needs interactive browser approval).
+  The `SSL_CERT_DIR` warning comes from one unreadable system cert file.
+- Training data: the pair plans to use Flock's pre-tokenized FineWeb-Edu.
+  Both live in S3 bucket `scaling-llama-3-2` (endpoint
+  `https://s3.flock.cerulean.works`, read via
+  `eval "$(flock s3 credentials --read-only --ttl 1h)"` + `pyarrow.fs.S3FileSystem`;
+  no aws CLI/boto3 installed). Inspected 2026-11-14; probe copies in
+  `/work/u7725908/flock-data-probe/`.
+  - `fineweb-edu-llama3-shuffled-151b/` (recommended): `metadata.json` says
+    tokenizer `meta-llama/Llama-3.2-1B`, source `s3://flock-datasets/fineweb-edu`
+    v1, dev set `cerulean-works/fineweb-edu-dev`, format
+    `[BOS, text, EOS] int32 tokens.npy + int64 offsets.npy, globally shuffled
+    into buckets`, seed 0. 3020 bucket dirs `000000/…`, all complete;
+    604.2 GB of `tokens.npy`, 151,049,225,365 tokens (matches manifest).
+  - `fineweb-edu-llama3/` (unshuffled, same 151.05B source): 2405 dirs versus
+    2403 manifest shards; `020282/` holds only `tokens.npy` and
+    `offsets.npy.tmp`. Not recommended.
+  - Bucket `000000` checks: int32, 48,763,502 tokens, 49,462 docs; offsets are
+    document starts plus the end; every doc is BOS…EOS; max id 128001.
+    50 random docs decode→re-encode identically with the pinned Llama 3.2
+    tokenizer. 0 of 49,462 docs exactly match any of the 5000 local dev docs
+    (token-sequence hash). One bucket is too small a sample to establish
+    exclusion; repeat the check over every downloaded bucket.
+  - Existing loader works unchanged:
+    `DataConfig(root=<dir>, pattern="*/tokens.npy", format="npy", seq_len=4096, num_tokens=N)`
+    → int64 `[4096]` inputs starting with BOS, targets shifted by one.
+  - Provenance (user, 2026-11-14): both `scaling-llama-3-2` copies were
+    tokenized and uploaded by another pair; they are not organizer data.
+  - Official source: Flock dataset `cerulean-labs/fineweb-edu`
+    = Lance `s3://flock-datasets/fineweb-edu` version 1 (only version), from
+    `HuggingFaceFW/fineweb-edu` revision `87f09149ef4734204d70ed1d046ddc9ca3f2b8f9`.
+    Raw text with `id`, `dump`, `token_count` (GPT-2) and other columns;
+    1,525,223,056 rows in 24,491 fragments. Fragment 1234 sample (20,000 docs):
+    Llama 3.2 tokens / GPT-2 `token_count` = 0.963; extrapolated ~1.57T Llama
+    tokens in total. Single-thread `encode_batch` ≈ 0.65M tok/s, so ~200B
+    tokens ≈ 90 core-hours.
+  - CPU partitions `ngs8g`/`ngs32g`/`ngs62g`/`ngs248c` reject account
+    ACD115198 (`sbatch --test-only`: invalid account/partition).
+  - Agreed (2026-11-14): build one shared ~205B-token pool from the official
+    source, excluding dev ids; shuffle by randomly selecting fragments across
+    dumps, then shuffling documents at shard level, with a recorded seed.
+    Each run takes a prefix of the pool. Open: `pylance` dependency versus HF
+    parquet through the existing `prepare_token_shards`; BOS convention.
+  - Budget gap: 151.05B < 200B. A 200B config raises
+    `ValueError: num_samples must be in [...]` from `Truncate`, so the final
+    run needs an agreed repeat (about 1.32 passes) or another source.
+  Before use, verify its tokenizer, BOS/EOS convention, dtype/format, and
+  exclusion of the 5000 dev documents.
 
 ## Resume Here
 

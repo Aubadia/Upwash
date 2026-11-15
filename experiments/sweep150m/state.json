@@ -1,0 +1,410 @@
+{
+ "runs": {
+  "s1-lr0.002-mb0.9": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.002-mb0.9.json",
+   "attempts": [
+    "773541"
+   ],
+   "result": {
+    "eval/loss": 2.97787,
+    "eval/perplexity": 19.64602,
+    "train/loss": 3.18438,
+    "train/tokens_per_second": 1547598.47945,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s1-lr0.004-mb0.9": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.004-mb0.9.json",
+   "attempts": [
+    "773542"
+   ],
+   "result": {
+    "eval/loss": 2.96143,
+    "eval/perplexity": 19.32553,
+    "train/loss": 3.1637,
+    "train/tokens_per_second": 1528348.20204,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s1-lr0.008-mb0.9": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.008-mb0.9.json",
+   "attempts": [
+    "773543"
+   ],
+   "result": {
+    "eval/loss": 4.49897,
+    "eval/perplexity": 89.92421,
+    "train/loss": 4.66931,
+    "train/tokens_per_second": 1696424.569,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s1-lr0.016-mb0.9": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.016-mb0.9.json",
+   "attempts": [
+    "773544"
+   ],
+   "result": {
+    "eval/loss": 4.45902,
+    "eval/perplexity": 86.4024,
+    "train/loss": 4.61153,
+    "train/tokens_per_second": 1588431.61152,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s1-lr0.032-mb0.9": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.032-mb0.9.json",
+   "attempts": [
+    "773545"
+   ],
+   "result": {
+    "eval/loss": 6.60652,
+    "eval/perplexity": 739.90065,
+    "train/loss": 6.61673,
+    "train/tokens_per_second": 1653991.7428,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s1-lr0.002-mb0.95": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.002-mb0.95.json",
+   "attempts": [
+    "773546"
+   ],
+   "result": {
+    "eval/loss": 2.97982,
+    "eval/perplexity": 19.68421,
+    "train/loss": 3.18115,
+    "train/tokens_per_second": 1630544.88478,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s1-lr0.004-mb0.95": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.004-mb0.95.json",
+   "attempts": [
+    "773547"
+   ],
+   "result": {
+    "eval/loss": 2.9735,
+    "eval/perplexity": 19.56031,
+    "train/loss": 3.17612,
+    "train/tokens_per_second": 1708013.42157,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s1-lr0.008-mb0.95": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.008-mb0.95.json",
+   "attempts": [
+    "773548"
+   ],
+   "result": {
+    "eval/loss": 4.44331,
+    "eval/perplexity": 85.05589,
+    "train/loss": 4.59461,
+    "train/tokens_per_second": 1592750.62984,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s1-lr0.016-mb0.95": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.016-mb0.95.json",
+   "attempts": [
+    "773549"
+   ],
+   "result": {
+    "eval/loss": 5.62043,
+    "eval/perplexity": 276.00737,
+    "train/loss": 5.70934,
+    "train/tokens_per_second": 1623486.76982,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s1-lr0.032-mb0.95": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.032-mb0.95.json",
+   "attempts": [
+    "773550"
+   ],
+   "result": {
+    "eval/loss": 9.01163,
+    "eval/perplexity": 8197.90934,
+    "train/loss": 8.92434,
+    "train/tokens_per_second": 1630977.34673,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s1-lr0.002-mb0.98": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.002-mb0.98.json",
+   "attempts": [
+    "773890"
+   ],
+   "result": {
+    "eval/loss": 3.05515,
+    "eval/perplexity": 21.22439,
+    "train/loss": 3.25795,
+    "train/tokens_per_second": 1703133.79131,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s1-lr0.004-mb0.98": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.004-mb0.98.json",
+   "attempts": [
+    "773891"
+   ],
+   "result": {
+    "eval/loss": 4.59691,
+    "eval/perplexity": 99.1772,
+    "train/loss": 4.75557,
+    "train/tokens_per_second": 1619476.79593,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s1-lr0.008-mb0.98": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.008-mb0.98.json",
+   "attempts": [
+    "773892"
+   ],
+   "result": {
+    "eval/loss": 5.23261,
+    "eval/perplexity": 187.28111,
+    "train/loss": 5.34505,
+    "train/tokens_per_second": 1520259.37364,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s1-lr0.016-mb0.98": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.016-mb0.98.json",
+   "attempts": [
+    "773893"
+   ],
+   "result": {
+    "eval/loss": 5.32918,
+    "eval/perplexity": 206.26817,
+    "train/loss": 5.42401,
+    "train/tokens_per_second": 1674858.56662,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s1-lr0.032-mb0.98": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.032-mb0.98.json",
+   "attempts": [
+    "773894"
+   ],
+   "result": {
+    "eval/loss": Infinity,
+    "eval/perplexity": NaN,
+    "train/loss": NaN,
+    "train/tokens_per_second": 1748667.93721,
+    "train/total_tokens_seen": 2999975936.0,
+    "diverged": true
+   }
+  },
+  "s1-lr0.002-mb0.99": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.002-mb0.99.json",
+   "attempts": [
+    "773895"
+   ],
+   "result": {
+    "eval/loss": 3.26383,
+    "eval/perplexity": 26.14946,
+    "train/loss": 3.46425,
+    "train/tokens_per_second": 1647623.29463,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s1-lr0.004-mb0.99": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.004-mb0.99.json",
+   "attempts": [
+    "773896"
+   ],
+   "result": {
+    "eval/loss": 4.6641,
+    "eval/perplexity": 106.06978,
+    "train/loss": 4.80901,
+    "train/tokens_per_second": 1708563.32715,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s1-lr0.008-mb0.99": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.008-mb0.99.json",
+   "attempts": [
+    "773898"
+   ],
+   "result": {
+    "eval/loss": 5.40085,
+    "eval/perplexity": 221.59507,
+    "train/loss": 5.49653,
+    "train/tokens_per_second": 1690972.38825,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s1-lr0.016-mb0.99": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.016-mb0.99.json",
+   "attempts": [
+    "773899"
+   ],
+   "result": {
+    "eval/loss": Infinity,
+    "eval/perplexity": NaN,
+    "train/loss": NaN,
+    "train/tokens_per_second": 1744418.36619,
+    "train/total_tokens_seen": 2999975936.0,
+    "diverged": true
+   }
+  },
+  "s1-lr0.032-mb0.99": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s1-lr0.032-mb0.99.json",
+   "attempts": [
+    "773900"
+   ],
+   "result": {
+    "eval/loss": Infinity,
+    "eval/perplexity": NaN,
+    "train/loss": NaN,
+    "train/tokens_per_second": 1746574.74596,
+    "train/total_tokens_seen": 2999975936.0,
+    "diverged": true
+   }
+  },
+  "s2-lr0.004-mb0.9-b1_0.9": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s2-lr0.004-mb0.9-b1_0.9.json",
+   "attempts": [
+    "774035"
+   ],
+   "result": {
+    "eval/loss": 2.95915,
+    "eval/perplexity": 19.28157,
+    "train/loss": 3.15992,
+    "train/tokens_per_second": 1518160.74332,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s2-noise-lr0.004-mb0.9-seed1": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s2-noise-lr0.004-mb0.9-seed1.json",
+   "attempts": [
+    "774036"
+   ],
+   "result": {
+    "eval/loss": 2.9586,
+    "eval/perplexity": 19.27098,
+    "train/loss": 3.16065,
+    "train/tokens_per_second": 1705797.06498,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s3-lr0.004-mb0.9-b1_0.9-b2_0.95-m1.6": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s3-lr0.004-mb0.9-b1_0.9-b2_0.95-m1.6.json",
+   "attempts": [
+    "774113"
+   ],
+   "result": {
+    "eval/loss": 2.96213,
+    "eval/perplexity": 19.3392,
+    "train/loss": 3.16361,
+    "train/tokens_per_second": 1540074.24929,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s3-lr0.004-mb0.9-b1_0.9-b2_0.95-m1.7": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s3-lr0.004-mb0.9-b1_0.9-b2_0.95-m1.7.json",
+   "attempts": [
+    "774114"
+   ],
+   "result": {
+    "eval/loss": 2.95704,
+    "eval/perplexity": 19.24102,
+    "train/loss": 3.15925,
+    "train/tokens_per_second": 1628153.52528,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s3-lr0.004-mb0.9-b1_0.9-b2_0.98-m1.5": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s3-lr0.004-mb0.9-b1_0.9-b2_0.98-m1.5.json",
+   "attempts": [
+    "774115"
+   ],
+   "result": {
+    "eval/loss": 2.94284,
+    "eval/perplexity": 18.96973,
+    "train/loss": 3.14016,
+    "train/tokens_per_second": 1448984.21866,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s3-lr0.004-mb0.9-b1_0.9-b2_0.98-m1.6": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s3-lr0.004-mb0.9-b1_0.9-b2_0.98-m1.6.json",
+   "attempts": [
+    "774116"
+   ],
+   "result": {
+    "eval/loss": 2.94253,
+    "eval/perplexity": 18.96382,
+    "train/loss": 3.14276,
+    "train/tokens_per_second": 1646588.88857,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s3-lr0.004-mb0.9-b1_0.9-b2_0.98-m1.7": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s3-lr0.004-mb0.9-b1_0.9-b2_0.98-m1.7.json",
+   "attempts": [
+    "774117"
+   ],
+   "result": {
+    "eval/loss": 2.94281,
+    "eval/perplexity": 18.96906,
+    "train/loss": 3.14631,
+    "train/tokens_per_second": 1587437.44908,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s3-lr0.004-mb0.9-b1_0.9-b2_0.99-m1.5": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s3-lr0.004-mb0.9-b1_0.9-b2_0.99-m1.5.json",
+   "attempts": [
+    "774118"
+   ],
+   "result": {
+    "eval/loss": 2.93987,
+    "eval/perplexity": 18.91344,
+    "train/loss": 3.14299,
+    "train/tokens_per_second": 1694673.7481,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s3-lr0.004-mb0.9-b1_0.9-b2_0.99-m1.6": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s3-lr0.004-mb0.9-b1_0.9-b2_0.99-m1.6.json",
+   "attempts": [
+    "774119"
+   ],
+   "result": {
+    "eval/loss": 2.93563,
+    "eval/perplexity": 18.83332,
+    "train/loss": 3.13322,
+    "train/tokens_per_second": 1662310.23949,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  },
+  "s3-lr0.004-mb0.9-b1_0.9-b2_0.99-m1.7": {
+   "config": "/work/u7725908/Upwash/configs/sweep150m/s3-lr0.004-mb0.9-b1_0.9-b2_0.99-m1.7.json",
+   "attempts": [
+    "774120"
+   ],
+   "result": {
+    "eval/loss": 2.94092,
+    "eval/perplexity": 18.93328,
+    "train/loss": 3.14423,
+    "train/tokens_per_second": 1632222.86434,
+    "train/total_tokens_seen": 2999975936.0
+   }
+  }
+ },
+ "excluded": [
+  "25a-hgpn001",
+  "25a-hgpn003",
+  "25a-hgpn020",
+  "25a-hgpn039",
+  "25a-hgpn056",
+  "25a-hgpn062",
+  "25a-hgpn069",
+  "25a-hgpn071",
+  "25a-hgpn083",
+  "25a-hgpn173"
+ ],
+ "pool_ok": true
+}

@@ -1,0 +1,56 @@
+{
+  "case": "native-repeat",
+  "world_size": 4,
+  "local_batch": 8,
+  "global_batch": 32,
+  "windows": [
+    {
+      "seconds": 9.239261250942945,
+      "step_ms": 92.39261250942945,
+      "tokens_per_second": 1418641.5606185286,
+      "loss": 7.235880737304687
+    },
+    {
+      "seconds": 9.298199935350567,
+      "step_ms": 92.98199935350567,
+      "tokens_per_second": 1409649.1892122154,
+      "loss": 6.001420288085938
+    },
+    {
+      "seconds": 9.313766644336283,
+      "step_ms": 93.13766644336283,
+      "tokens_per_second": 1407293.1500780631,
+      "loss": 5.443245849609375
+    }
+  ],
+  "peak_allocated_bytes": 26078109184.0,
+  "peak_reserved_bytes": 33619443712.0,
+  "median_tokens_per_second": 1409649.1892122154,
+  "gpu_hours_per_billion_tokens": 0.7882181748581414,
+  "warmup_and_compile_seconds": 11.177720440085977,
+  "options": {
+    "config": "configs/base150m/base150m-30b-seed2-am1.6.json",
+    "name": "native-repeat",
+    "output": "/work/asciibase64/upwash/speed150m/778509/native-repeat.json",
+    "mode": "default",
+    "scope": "objective",
+    "fused_loss": false,
+    "fused_adam": true,
+    "compile_optimizer": false,
+    "prefetch": true,
+    "profile": false,
+    "numerics": false,
+    "global_batch": 32,
+    "warmup": 40,
+    "steps": 100,
+    "windows": 3
+  },
+  "versions": {
+    "torch": "2.15.0",
+    "transformers": "5.22.2",
+    "triton": "3.9.0"
+  },
+  "job_id": "778509",
+  "node": "25a-hgpn004",
+  "source_sha256": "a1e9c262a204a1aff7073becb079e9647da296c7bf312ae43a944725c8000c93"
+}

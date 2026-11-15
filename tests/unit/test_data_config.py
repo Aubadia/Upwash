@@ -77,4 +77,5 @@ def test_data_config_rejects_a_budget_smaller_than_one_sample(num_tokens):
 
 
 def test_data_config_to_dict_returns_every_setting():
-    assert make_data_config().to_dict() == FLOCK_150M
+    # shuffle_seed is optional (default None: storage order), so FLOCK_150M omits it.
+    assert make_data_config().to_dict() == {**FLOCK_150M, "shuffle_seed": None}

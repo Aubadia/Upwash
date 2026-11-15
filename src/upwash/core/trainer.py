@@ -67,10 +67,17 @@ class Trainer:
         pad_token_id=None,
         eval_steps=None,
         precision="fp32",
-        eval_perplexity=False
+        eval_perplexity=False,
+        max_grad_norm=None,
+        world_size=1,
     ):
         if precision not in ("fp32", "bf16"):
             raise ValueError(f"precision must be 'fp32' or 'bf16', got {precision!r}")
+        # Clip the total gradient norm to this value; train/grad_norm stays pre-clip.
+        self.max_grad_norm = max_grad_norm
+        # Data-parallel replicas that each consume an equally shaped batch per update;
+        # token metrics are multiplied by it so they report global counts.
+        self.world_size = world_size
         self.state = TrainingState()
         self.model = model
         self.loss_fn = loss_fn
@@ -154,16 +161,26 @@ class Trainer:
         loss.backward()
 
         metrics = {}
-        if logging_enabled:
-            metrics["train/learning_rate"] = float(self.optimizer.param_groups[0]["lr"])
-            grad_norms = [
-                parameter.grad.detach().norm(2)
-                for parameter in self.model.parameters()
-                if parameter.grad is not None
-            ]
-            metrics["train/grad_norm"] = (
-                torch.stack(grad_norms).norm(2) if grad_norms else 0.0
+        grad_norm = None
+        if self.max_grad_norm is not None:
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                [p for p in self.model.parameters() if p.grad is not None], self.max_grad_norm
             )
+        if logging_enabled:
+            # The first group keeps the plain key; each further group adds one key,
+            # labelled by its "name" (falling back to its index).
+            groups = self.optimizer.param_groups
+            metrics["train/learning_rate"] = float(groups[0]["lr"])
+            for index, group in enumerate(groups[1:], start=1):
+                metrics[f"train/learning_rate/{group.get('name', index)}"] = float(group["lr"])
+            if grad_norm is None:
+                grad_norms = [
+                    parameter.grad.detach().norm(2)
+                    for parameter in self.model.parameters()
+                    if parameter.grad is not None
+                ]
+                grad_norm = torch.stack(grad_norms).norm(2) if grad_norms else 0.0
+            metrics["train/grad_norm"] = grad_norm
 
         self.optimizer.step()
         if self.lr_scheduler is not None:
@@ -179,6 +196,7 @@ class Trainer:
             if self.pad_token_id is None
             else torch.count_nonzero(inputs != self.pad_token_id)
         )
+        tokens = tokens * self.world_size
         self._total_tokens_seen += tokens
         return tokens
 

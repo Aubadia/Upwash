@@ -1,0 +1,27 @@
+{
+  "world_size": 8,
+  "global_batch": 32,
+  "flags": [
+    "--scope",
+    "objective",
+    "--mode",
+    "max-autotune",
+    "--fused-adam",
+    "--prefetch",
+    "--compile-optimizer"
+  ],
+  "acceptance_passed": true,
+  "acceptance_job": "778783",
+  "benchmark_job": "778734",
+  "selection": "Maximum measured steady throughput; much higher cold compilation cost.",
+  "median_tokens_per_second": 2601376.948166099,
+  "limitations": [
+    "Short numerical/integration validation does not establish 30B convergence.",
+    "Optimizer compilation is used only at the constant-LR plateau; warmup/decay preserve eager float-LR updates.",
+    "No formal 30B job is automatically submitted."
+  ],
+  "benchmark_cases": [
+    "native-max-combined"
+  ],
+  "reference_tokens_per_second": 1973827.637529813
+}

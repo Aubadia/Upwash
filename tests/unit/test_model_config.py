@@ -121,4 +121,4 @@ def test_model_config_rejects_non_positive_or_nonfinite_scalars(name, value):
 
 def test_model_config_to_dict_returns_every_setting():
     # Recorded in the run config: the spec requires model configuration and initialization.
-    assert make_model_config().to_dict() == MODEL_150M
+    assert make_model_config().to_dict() == {**MODEL_150M, "residual_scale_by_depth": False}

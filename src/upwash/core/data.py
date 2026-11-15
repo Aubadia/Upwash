@@ -95,6 +95,58 @@ class Truncate:
 
 
 
+class Permute:
+    """Seeded permutation of sample order; the same seed gives the same order on every rank."""
+
+    def __init__(self, dataset, seed):
+        self.dataset = dataset
+        n = len(dataset)
+        order = np.random.default_rng(seed).permutation(n)
+        self.order = order.astype(np.int32) if n < 2**31 else order
+
+    def __len__(self):
+        return len(self.order)
+
+    def __getitem__(self, i):
+        return self.dataset[int(self.order[i])]
+
+
+class RankShard:
+    """This rank's samples when every global batch holds `batch_size` samples per rank.
+
+    Global batch g consists of samples [g*W*B, (g+1)*W*B); rank r takes the r-th
+    block of B. Every rank therefore sees the same batch count and shapes, which
+    DDP needs; a dataset that does not fill whole global batches is rejected.
+    """
+
+    def __init__(self, dataset, *, rank, world_size, batch_size):
+        if not 0 <= rank < world_size:
+            raise ValueError(f"rank must be in [0, {world_size}), got {rank}")
+        global_batch = world_size * batch_size
+        if len(dataset) % global_batch:
+            raise ValueError(
+                f"{len(dataset)} samples do not fill whole global batches of {global_batch} "
+                f"({world_size} ranks x {batch_size}); choose num_tokens as a multiple of "
+                f"{global_batch} x seq_len"
+            )
+        self.dataset = dataset
+        self.rank = rank
+        self.batch_size = batch_size
+        self.global_batch = global_batch
+        self.length = len(dataset) // world_size
+
+    def __len__(self):
+        return self.length
+
+    def __getitem__(self, i):
+        if i < 0:
+            i += self.length
+        if i < 0 or i >= self.length:
+            raise IndexError(f"index {i} out of range for {self.length} samples")
+        batch, offset = divmod(i, self.batch_size)
+        return self.dataset[batch * self.global_batch + self.rank * self.batch_size + offset]
+
+
 def read_parquet_rows(path, columns):
     for batch in pq.ParquetFile(path).iter_batches(columns=columns):
         for row in batch.to_pylist():

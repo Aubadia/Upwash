@@ -1,0 +1,49 @@
+========================================
+Start Time: 2026-11-14 02:36:32
+========================================
+wandb: Loading settings from /home/asciibase64/.config/wandb/settings
+wandb: [wandb.login()] Loaded credentials for https://flock-api.cerulean.works from WANDB_API_KEY.
+wandb: Currently logged in as: asciibase64@gmail.com (cerulean-labs) to https://flock-api.cerulean.works. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.31.0
+wandb: Run data is saved locally in /work/asciibase64/upwash/wandb/wandb/run-20261114_023704-pooxeabn
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run synthetic-llama-smoke-772902-20261114-023632
+wandb: ⭐️ View project at https://flock-api.cerulean.works/cerulean-labs/lab6-predictable-scaling
+wandb: 🚀 View run at https://flock-api.cerulean.works/cerulean-labs/lab6-predictable-scaling/runs/pooxeabn
+wandb: updating run metadata
+wandb: 
+wandb: Run history:
+wandb:               eval/loss █▃▁
+wandb:         eval/perplexity █▂▁
+wandb:         train/grad_norm ▃▁▅█▇▇▂▁
+wandb:     train/learning_rate ▁▁▁▁▁▁▁▁
+wandb:              train/loss █▇▆▅▄▃▂▁
+wandb: train/tokens_per_second ▁▇█▇███▇
+wandb: train/total_tokens_seen ▁▂▃▄▅▆▇█
+wandb: 
+wandb: Run summary:
+wandb:               eval/loss 1.46759
+wandb:         eval/perplexity 4.33877
+wandb:         train/grad_norm 2.34145
+wandb:     train/learning_rate 0.002
+wandb:              train/loss 1.62479
+wandb: train/tokens_per_second 43643.8419
+wandb: train/total_tokens_seen 4096
+wandb: 
+wandb: 🚀 View run synthetic-llama-smoke-772902-20261114-023632 at: https://flock-api.cerulean.works/cerulean-labs/lab6-predictable-scaling/runs/pooxeabn
+wandb: ⭐️ View project at: https://flock-api.cerulean.works/cerulean-labs/lab6-predictable-scaling
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: /work/asciibase64/upwash/wandb/wandb/run-20261114_023704-pooxeabn/logs
+....Synthetic HF reference loss: 3.597900
+Synthetic train=4,096 tokens, dev=1,024 tokens, steps=8
+Synthetic dev evaluation 1: {'loss': 2.72979736328125, 'num_targets': 1024}
+Synthetic dev evaluation 2: {'loss': 1.857421875, 'num_targets': 1024}
+Synthetic dev evaluation 3: {'loss': 1.46759033203125, 'num_targets': 1024}
+.
+5 passed in 31.53s
+shutdown can only be called once
+========================================
+End Time: 2026-11-14 02:37:08
+Total Cost: 36 s
+Exit Status: 0
+========================================

@@ -1,0 +1,131 @@
+{
+  "status": "proposal_requires_experimental_group_support_not_directly_loadable",
+  "reference_paper": "https://arxiv.org/pdf/2512.05620v2",
+  "reference_config": "configs/base150m/base150m-30b-seed2-lr0.002-am1.6.json",
+  "base_scale_lr": 0.002,
+  "run_config": {
+    "model": {
+      "vocab_size": 128256,
+      "n_layers": 9,
+      "d_model": 1024,
+      "d_ff": 5184,
+      "n_heads": 16,
+      "n_kv_heads": 4,
+      "max_seq_len": 4096,
+      "rope_theta": 500000.0,
+      "norm_eps": 1e-05,
+      "embedding_std": 0.1,
+      "output_std_coeff": 1.0,
+      "residual_scale_by_depth": true
+    },
+    "eval_data": {
+      "root": "/work/asciibase64/fineweb-edu-dev-tokens/data",
+      "pattern": "validation-*.bin",
+      "format": "bin",
+      "seq_len": 4096,
+      "num_tokens": 5357568,
+      "shuffle_seed": null
+    },
+    "eval_batch_size": 8,
+    "device": "cuda",
+    "seed": 2,
+    "schedule": {
+      "warmup_ratio": 0.0005,
+      "decay_ratio": 0.1,
+      "decay_shape": "power",
+      "decay_power": 1.0
+    },
+    "batch_size": 4,
+    "tokenizer": "meta-llama/Llama-3.2-1B",
+    "tokenizer_revision": "4e20de362430cd3b72f300e6b0f18e50e7166e08",
+    "export_max_position_embeddings": 8192,
+    "output_dir": "/work/asciibase64/upwash/runs/300m-60b-base-lr0.002-power-p1",
+    "train_data": {
+      "root": "/work/asciibase64/fineweb-edu-llama3-upwash/shards",
+      "pattern": "*.bin",
+      "format": "bin",
+      "shuffle_seed": 0,
+      "seq_len": 4096,
+      "num_tokens": 59999911936
+    },
+    "training": {
+      "optimizer": {
+        "lr": 0.0017320508075688772,
+        "muon_beta": 0.9,
+        "adam_beta1": 0.9,
+        "adam_beta2": 0.99,
+        "adam_lr_multiplier": 1.8475208614068026,
+        "weight_decay": 0.04
+      },
+      "logging_steps": 100,
+      "eval_steps": 22888,
+      "precision": "bf16",
+      "max_grad_norm": 1.0
+    },
+    "logging": {
+      "project": "lab6-predictable-scaling",
+      "name": "300m-60b-base-lr0.002-power-p1",
+      "group": "300m-60b-paper-transfer-seed2"
+    },
+    "attention_implementation": "flash_attention_3",
+    "compile_model": true,
+    "compile_mode": "default"
+  },
+  "required_optimizer_groups": [
+    {
+      "name": "muon_main",
+      "parameter_patterns": [
+        "*.self_attn.*_proj.weight",
+        "*.mlp.gate_proj.weight",
+        "*.mlp.up_proj.weight"
+      ],
+      "lr": 0.0017320508075688772,
+      "weight_decay": 4.510548978043952e-05,
+      "optimizer": "Muon",
+      "adjust_lr_fn": "match_rms_adamw"
+    },
+    {
+      "name": "muon_down",
+      "parameter_patterns": [
+        "*.mlp.down_proj.weight"
+      ],
+      "lr": 0.0013685339714124463,
+      "weight_decay": 5.708663550336876e-05,
+      "optimizer": "Muon",
+      "adjust_lr_fn": "match_rms_adamw"
+    },
+    {
+      "name": "adamw",
+      "parameter_patterns": [
+        "model.embed_tokens.weight",
+        "*.input_layernorm.weight",
+        "*.post_attention_layernorm.weight",
+        "model.norm.weight"
+      ],
+      "lr": 0.0032,
+      "weight_decay": 3.9062499999999994e-05,
+      "optimizer": "AdamW"
+    }
+  ],
+  "execution": {
+    "world_size": 8,
+    "global_batch": 32,
+    "tokens_per_update": 131072,
+    "total_steps": 457763,
+    "actual_tokens": 59999911936,
+    "requested_tokens": 60000000000,
+    "warmup_steps": 228,
+    "decay_steps": 45776,
+    "flags": [
+      "--scope",
+      "objective",
+      "--mode",
+      "default",
+      "--fused-adam",
+      "--prefetch",
+      "--compile-optimizer"
+    ],
+    "gpu_validation": "required_for_300m_not_yet_run"
+  },
+  "weight_decay_policy": "Fix plateau independent decay across LR candidates, anchored to the actual 150M LR=0.002 run; multiply by the WSD factor each step. Group weight_decay is passed directly to torch optimizers, without another division by width."
+}

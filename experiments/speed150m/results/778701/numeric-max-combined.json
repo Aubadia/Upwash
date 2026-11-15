@@ -1,0 +1,28 @@
+{
+  "case": "numeric-max-combined",
+  "errors": {
+    "loss_relative": 9.393608909453067e-05,
+    "gradient_relative": 0.009036467410624027,
+    "update_relative": 0.01103707030415535,
+    "tied_embedding_gradient_relative": 0.009111794643104076
+  },
+  "reference_losses": [
+    11.759521484375,
+    11.7666015625,
+    11.765869140625
+  ],
+  "candidate_losses": [
+    11.759490966796875,
+    11.767706871032715,
+    11.766375541687012
+  ],
+  "passed": true,
+  "versions": {
+    "torch": "2.15.0",
+    "transformers": "5.22.2",
+    "triton": "3.9.0"
+  },
+  "job_id": "778701",
+  "node": "25a-hgpn004",
+  "source_sha256": "9673bf5912dd729aa12c81c42f1fe28b00c1715e382205e4b23b6d5511f5e877"
+}

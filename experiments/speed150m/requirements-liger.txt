@@ -1,0 +1,2 @@
+# Install only into the user-approved isolated --target directory, with --no-deps.
+liger-kernel==0.8.5

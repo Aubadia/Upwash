@@ -1,0 +1,57 @@
+{
+  "case": "prefetch",
+  "world_size": 8,
+  "local_batch": 4,
+  "global_batch": 32,
+  "windows": [
+    {
+      "seconds": 6.371509049087763,
+      "step_ms": 63.71509049087763,
+      "tokens_per_second": 2057157.8724943686,
+      "loss": 7.238948974609375
+    },
+    {
+      "seconds": 6.408826129510999,
+      "step_ms": 64.08826129510999,
+      "tokens_per_second": 2045179.5282204193,
+      "loss": 6.005443115234375
+    },
+    {
+      "seconds": 6.4210350615903735,
+      "step_ms": 64.21035061590374,
+      "tokens_per_second": 2041290.8315055338,
+      "loss": 5.449271240234375
+    }
+  ],
+  "peak_allocated_bytes": 26899720704.0,
+  "peak_reserved_bytes": 38652608512.0,
+  "median_tokens_per_second": 2045179.5282204193,
+  "gpu_hours_per_billion_tokens": 1.0865658449827404,
+  "warmup_and_compile_seconds": 9.918519049882889,
+  "options": {
+    "config": "configs/base150m/base150m-30b-seed2-am1.6.json",
+    "name": "prefetch",
+    "output": "/work/asciibase64/upwash/speed150m/778734/prefetch.json",
+    "mode": "default",
+    "scope": "model",
+    "fused_loss": false,
+    "eager_fused_loss": false,
+    "fused_adam": false,
+    "compile_optimizer": false,
+    "prefetch": true,
+    "profile": false,
+    "numerics": false,
+    "global_batch": 32,
+    "warmup": 40,
+    "steps": 100,
+    "windows": 3
+  },
+  "versions": {
+    "torch": "2.15.0",
+    "transformers": "5.22.2",
+    "triton": "3.9.0"
+  },
+  "job_id": "778734",
+  "node": "25a-hgpn061",
+  "source_sha256": "9673bf5912dd729aa12c81c42f1fe28b00c1715e382205e4b23b6d5511f5e877"
+}

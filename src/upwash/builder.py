@@ -3,7 +3,7 @@ from pathlib import Path
 
 from upwash.core.trainer import Trainer
 from upwash.config import TrainingConfig, DataConfig
-from upwash.core.data import PackedTokenDataset, Truncate, ConcatDataset
+from upwash.core.data import PackedTokenDataset, Permute, Truncate, ConcatDataset
 
 def build_trainer(
         config: TrainingConfig,
@@ -17,7 +17,7 @@ def build_trainer(
         count_tokens=False,
         pad_token_id=None,
         eval_perplexity = False,
-
+        world_size=1,
     ) -> Trainer:
     optim = optimizer_factory(model, config=config.optimizer)
 
@@ -39,6 +39,8 @@ def build_trainer(
         eval_steps=config.eval_steps,
         precision=config.precision,
         eval_perplexity=eval_perplexity,
+        max_grad_norm=config.max_grad_norm,
+        world_size=world_size,
     )
 
 def build_dataset(config: DataConfig):
@@ -51,4 +53,7 @@ def build_dataset(config: DataConfig):
     else:
         shards = [PackedTokenDataset(path, config.seq_len) for path in paths]
 
-    return Truncate(ConcatDataset(shards), num_samples=config.num_tokens // config.seq_len)
+    pool = ConcatDataset(shards)
+    if config.shuffle_seed is not None:
+        pool = Permute(pool, config.shuffle_seed)
+    return Truncate(pool, num_samples=config.num_tokens // config.seq_len)

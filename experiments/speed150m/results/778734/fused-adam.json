@@ -1,0 +1,57 @@
+{
+  "case": "fused-adam",
+  "world_size": 8,
+  "local_batch": 4,
+  "global_batch": 32,
+  "windows": [
+    {
+      "seconds": 6.516731842420995,
+      "step_ms": 65.16731842420995,
+      "tokens_per_second": 2011314.922409116,
+      "loss": 7.235374145507812
+    },
+    {
+      "seconds": 6.514308016747236,
+      "step_ms": 65.14308016747236,
+      "tokens_per_second": 2012063.2868914858,
+      "loss": 6.000047607421875
+    },
+    {
+      "seconds": 6.520195296034217,
+      "step_ms": 65.20195296034217,
+      "tokens_per_second": 2010246.5347889506,
+      "loss": 5.4397430419921875
+    }
+  ],
+  "peak_allocated_bytes": 26899465728.0,
+  "peak_reserved_bytes": 38650511360.0,
+  "median_tokens_per_second": 2011314.922409116,
+  "gpu_hours_per_billion_tokens": 1.104860406226433,
+  "warmup_and_compile_seconds": 10.122023252770305,
+  "options": {
+    "config": "configs/base150m/base150m-30b-seed2-am1.6.json",
+    "name": "fused-adam",
+    "output": "/work/asciibase64/upwash/speed150m/778734/fused-adam.json",
+    "mode": "default",
+    "scope": "model",
+    "fused_loss": false,
+    "eager_fused_loss": false,
+    "fused_adam": true,
+    "compile_optimizer": false,
+    "prefetch": false,
+    "profile": false,
+    "numerics": false,
+    "global_batch": 32,
+    "warmup": 40,
+    "steps": 100,
+    "windows": 3
+  },
+  "versions": {
+    "torch": "2.15.0",
+    "transformers": "5.22.2",
+    "triton": "3.9.0"
+  },
+  "job_id": "778734",
+  "node": "25a-hgpn061",
+  "source_sha256": "9673bf5912dd729aa12c81c42f1fe28b00c1715e382205e4b23b6d5511f5e877"
+}

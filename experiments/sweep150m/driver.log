@@ -1,0 +1,73 @@
+[2026-11-14 05:13:23] driver started
+[2026-11-14 05:17:12] restarted with edge extension
+[2026-11-14 05:17:12] driver started
+[2026-11-14 06:16:26] pool job 773200 ended: COMPLETED
+[2026-11-14 06:17:19] restarted after dev-exclusion check
+[2026-11-14 06:17:19] driver started
+[2026-11-14 06:17:19] pool job 773200 ended: COMPLETED
+[2026-11-14 06:18:00] pool verified
+[2026-11-14 06:18:01] submitted s1-lr0.002-mb0.9 as job 773541
+[2026-11-14 06:18:01] submitted s1-lr0.004-mb0.9 as job 773542
+[2026-11-14 06:18:02] submitted s1-lr0.008-mb0.9 as job 773543
+[2026-11-14 06:18:02] submitted s1-lr0.016-mb0.9 as job 773544
+[2026-11-14 06:18:03] submitted s1-lr0.032-mb0.9 as job 773545
+[2026-11-14 06:18:04] submitted s1-lr0.002-mb0.95 as job 773546
+[2026-11-14 06:18:04] submitted s1-lr0.004-mb0.95 as job 773547
+[2026-11-14 06:18:05] submitted s1-lr0.008-mb0.95 as job 773548
+[2026-11-14 06:18:05] submitted s1-lr0.016-mb0.95 as job 773549
+[2026-11-14 06:18:06] submitted s1-lr0.032-mb0.95 as job 773550
+[2026-11-14 06:50:27] s1-lr0.004-mb0.9 ok: eval/loss 2.9614, tok/s 1,528,348
+[2026-11-14 06:51:27] s1-lr0.002-mb0.9 ok: eval/loss 2.9779, tok/s 1,547,598
+[2026-11-14 06:51:28] s1-lr0.008-mb0.9 ok: eval/loss 4.4990, tok/s 1,696,425
+[2026-11-14 06:51:28] s1-lr0.016-mb0.9 ok: eval/loss 4.4590, tok/s 1,588,432
+[2026-11-14 06:51:28] s1-lr0.032-mb0.9 ok: eval/loss 6.6065, tok/s 1,653,992
+[2026-11-14 06:51:28] s1-lr0.002-mb0.95 ok: eval/loss 2.9798, tok/s 1,630,545
+[2026-11-14 06:51:28] s1-lr0.004-mb0.95 ok: eval/loss 2.9735, tok/s 1,708,013
+[2026-11-14 06:51:28] s1-lr0.008-mb0.95 ok: eval/loss 4.4433, tok/s 1,592,751
+[2026-11-14 07:22:29] s1-lr0.032-mb0.95 ok: eval/loss 9.0116, tok/s 1,630,977
+[2026-11-14 07:23:29] s1-lr0.016-mb0.95 ok: eval/loss 5.6204, tok/s 1,623,487
+[2026-11-14 07:23:30] submitted s1-lr0.002-mb0.98 as job 773890
+[2026-11-14 07:23:32] submitted s1-lr0.004-mb0.98 as job 773891
+[2026-11-14 07:23:34] submitted s1-lr0.008-mb0.98 as job 773892
+[2026-11-14 07:23:35] submitted s1-lr0.016-mb0.98 as job 773893
+[2026-11-14 07:23:37] submitted s1-lr0.032-mb0.98 as job 773894
+[2026-11-14 07:23:38] submitted s1-lr0.002-mb0.99 as job 773895
+[2026-11-14 07:23:40] submitted s1-lr0.004-mb0.99 as job 773896
+[2026-11-14 07:23:41] submitted s1-lr0.008-mb0.99 as job 773898
+[2026-11-14 07:23:42] submitted s1-lr0.016-mb0.99 as job 773899
+[2026-11-14 07:23:44] submitted s1-lr0.032-mb0.99 as job 773900
+[2026-11-14 07:55:28] s1-lr0.002-mb0.98 ok: eval/loss 3.0551, tok/s 1,703,134
+[2026-11-14 07:55:28] s1-lr0.008-mb0.98 ok: eval/loss 5.2326, tok/s 1,520,259
+[2026-11-14 07:55:28] s1-lr0.032-mb0.98 job 773894 failed (code): {'state': 'COMPLETED', 'exit': '0:0', 'tail': 'ng model shards: 100%|██████████| 1/1 [00:00<00:00,  1.12it/s]\nwandb: updating run metadata\nwandb: \nwandb: Run history:\nwandb:                 eval/loss ▁▃▅▇█      \nwandb:           eval/perplexity ▁▃▅▇█      \nwandb:           train/grad_norm ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█               \nwandb:       train/learning_rate ███████████████████████████████████▆▂▂▂▁\nwandb: train/learning_rate/adamw █████████████████████████████████████▆▄▁\nwandb:                train/loss ▁▁▁▁▁▁▁▂▁▂▂▂▂▂▂▂▂▂▃▂█                   \nwandb:   train/tokens_per_second ▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▂▁▁▁▁▁▁██████████████████\nwandb:   train/total_tokens_seen ▁▁▁▁▁▂▂▂▃▃▃▃▃▄▄▄▄▄▄▅▅▅▅▅▅▅▆▆▆▆▆▆▇▇▇█████\nwandb: \nwandb: Run summary:\nwandb:                 eval/loss nan\nwandb:           eval/perplexity nan\nwandb:           train/grad_norm nan\nwandb:       train/learning_rate 0\nwandb: train/learning_rate/adamw 0\nwandb:                train/loss nan\nwandb:   train/tokens_per_second 1748667.93721\nwandb:   train/total_tokens_seen 2999975936\nwandb: \nwandb: 🚀 View run s1-lr0.032-mb0.98 at: https://flock-api.cerulean.works/cerulean-labs/lab6-predictable-scaling/runs/ty38hwy9\nwandb: ⭐️ View project at: https://flock-api.cerulean.works/cerulean-labs/lab6-predictable-scaling\nwandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)\nwandb: Find logs at: /work/u7725908/upwash/wandb/wandb/run-20261114_072407-ty38hwy9/logs\nshutdown can only be called once\n[07:54:58 +1878s] done: /work/u7725908/upwash/runs/s1-lr0.032-mb0.98\n'}
+[2026-11-14 07:55:28] s1-lr0.002-mb0.99 ok: eval/loss 3.2638, tok/s 1,647,623
+[2026-11-14 07:55:28] s1-lr0.004-mb0.99 ok: eval/loss 4.6641, tok/s 1,708,563
+[2026-11-14 07:56:28] s1-lr0.004-mb0.98 ok: eval/loss 4.5969, tok/s 1,619,477
+[2026-11-14 07:56:28] s1-lr0.016-mb0.98 ok: eval/loss 5.3292, tok/s 1,674,859
+[2026-11-14 07:56:28] s1-lr0.008-mb0.99 ok: eval/loss 5.4009, tok/s 1,690,972
+[2026-11-14 07:58:56] driver started
+[2026-11-14 07:58:56] resuming s1-lr0.016-mb0.99 job 773899
+[2026-11-14 07:58:56] resuming s1-lr0.032-mb0.99 job 773900
+[2026-11-14 07:59:56] s1-lr0.032-mb0.98 ok: eval/loss inf, tok/s 1,748,668
+[2026-11-14 08:26:57] s1-lr0.032-mb0.99 ok: eval/loss inf, tok/s 1,746,575
+[2026-11-14 08:27:58] s1-lr0.016-mb0.99 ok: eval/loss inf, tok/s 1,744,418
+[2026-11-14 08:27:58] submitted s2-lr0.004-mb0.9-b1_0.9 as job 774035
+[2026-11-14 08:27:59] submitted s2-noise-lr0.004-mb0.9-seed1 as job 774036
+[2026-11-14 09:00:25] s2-noise-lr0.004-mb0.9-seed1 ok: eval/loss 2.9586, tok/s 1,705,797
+[2026-11-14 09:01:25] s2-lr0.004-mb0.9-b1_0.9 ok: eval/loss 2.9592, tok/s 1,518,161
+[2026-11-14 09:01:26] submitted s3-lr0.004-mb0.9-b1_0.9-b2_0.95-m1.6 as job 774113
+[2026-11-14 09:01:26] submitted s3-lr0.004-mb0.9-b1_0.9-b2_0.95-m1.7 as job 774114
+[2026-11-14 09:01:27] submitted s3-lr0.004-mb0.9-b1_0.9-b2_0.98-m1.5 as job 774115
+[2026-11-14 09:01:28] submitted s3-lr0.004-mb0.9-b1_0.9-b2_0.98-m1.6 as job 774116
+[2026-11-14 09:01:28] submitted s3-lr0.004-mb0.9-b1_0.9-b2_0.98-m1.7 as job 774117
+[2026-11-14 09:01:30] submitted s3-lr0.004-mb0.9-b1_0.9-b2_0.99-m1.5 as job 774118
+[2026-11-14 09:01:31] submitted s3-lr0.004-mb0.9-b1_0.9-b2_0.99-m1.6 as job 774119
+[2026-11-14 09:01:32] submitted s3-lr0.004-mb0.9-b1_0.9-b2_0.99-m1.7 as job 774120
+[2026-11-14 09:33:23] s3-lr0.004-mb0.9-b1_0.9-b2_0.95-m1.6 ok: eval/loss 2.9621, tok/s 1,540,074
+[2026-11-14 09:33:23] s3-lr0.004-mb0.9-b1_0.9-b2_0.95-m1.7 ok: eval/loss 2.9570, tok/s 1,628,154
+[2026-11-14 09:33:23] s3-lr0.004-mb0.9-b1_0.9-b2_0.98-m1.6 ok: eval/loss 2.9425, tok/s 1,646,589
+[2026-11-14 09:34:23] s3-lr0.004-mb0.9-b1_0.9-b2_0.98-m1.5 ok: eval/loss 2.9428, tok/s 1,448,984
+[2026-11-14 09:34:24] s3-lr0.004-mb0.9-b1_0.9-b2_0.98-m1.7 ok: eval/loss 2.9428, tok/s 1,587,437
+[2026-11-14 09:34:24] s3-lr0.004-mb0.9-b1_0.9-b2_0.99-m1.5 ok: eval/loss 2.9399, tok/s 1,694,674
+[2026-11-14 09:35:24] s3-lr0.004-mb0.9-b1_0.9-b2_0.99-m1.6 ok: eval/loss 2.9356, tok/s 1,662,310
+[2026-11-14 09:35:24] s3-lr0.004-mb0.9-b1_0.9-b2_0.99-m1.7 ok: eval/loss 2.9409, tok/s 1,632,223
+[2026-11-14 09:35:24] finished S1-S3

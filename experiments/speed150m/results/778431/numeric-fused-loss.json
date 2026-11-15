@@ -1,0 +1,28 @@
+{
+  "case": "numeric-fused-loss",
+  "errors": {
+    "loss_relative": 9.069411880653996e-05,
+    "gradient_relative": 0.006584275513887405,
+    "update_relative": 0.00940298568457365,
+    "tied_embedding_gradient_relative": 0.00686040660366416
+  },
+  "reference_losses": [
+    11.759521484375,
+    11.7666015625,
+    11.765869140625
+  ],
+  "candidate_losses": [
+    11.759513854980469,
+    11.767668724060059,
+    11.766404151916504
+  ],
+  "passed": true,
+  "versions": {
+    "torch": "2.15.0",
+    "transformers": "5.22.2",
+    "triton": "3.9.0"
+  },
+  "job_id": "778431",
+  "node": "25a-hgpn019",
+  "source_sha256": "a1e9c262a204a1aff7073becb079e9647da296c7bf312ae43a944725c8000c93"
+}

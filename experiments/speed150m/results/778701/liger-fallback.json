@@ -1,0 +1,57 @@
+{
+  "case": "liger-fallback",
+  "world_size": 4,
+  "local_batch": 8,
+  "global_batch": 32,
+  "windows": [
+    {
+      "seconds": 13.644139028154314,
+      "step_ms": 136.44139028154314,
+      "tokens_per_second": 960646.910219373,
+      "loss": 7.238377685546875
+    },
+    {
+      "seconds": 13.685217726044357,
+      "step_ms": 136.85217726044357,
+      "tokens_per_second": 957763.351843184,
+      "loss": 6.006710205078125
+    },
+    {
+      "seconds": 13.709095312748104,
+      "step_ms": 137.09095312748104,
+      "tokens_per_second": 956095.1835976805,
+      "loss": 5.44803466796875
+    }
+  ],
+  "peak_allocated_bytes": 10107802624.0,
+  "peak_reserved_bytes": 10708058112.0,
+  "median_tokens_per_second": 957763.351843184,
+  "gpu_hours_per_billion_tokens": 1.1601102808672041,
+  "warmup_and_compile_seconds": 14.131285479757935,
+  "options": {
+    "config": "configs/base150m/base150m-30b-seed2-am1.6.json",
+    "name": "liger-fallback",
+    "output": "/work/asciibase64/upwash/speed150m/778701/liger-fallback.json",
+    "mode": "default",
+    "scope": "model",
+    "fused_loss": true,
+    "eager_fused_loss": true,
+    "fused_adam": false,
+    "compile_optimizer": false,
+    "prefetch": false,
+    "profile": false,
+    "numerics": false,
+    "global_batch": 32,
+    "warmup": 40,
+    "steps": 100,
+    "windows": 3
+  },
+  "versions": {
+    "torch": "2.15.0",
+    "transformers": "5.22.2",
+    "triton": "3.9.0"
+  },
+  "job_id": "778701",
+  "node": "25a-hgpn004",
+  "source_sha256": "9673bf5912dd729aa12c81c42f1fe28b00c1715e382205e4b23b6d5511f5e877"
+}
