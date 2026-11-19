@@ -10,15 +10,14 @@ def build_trainer(
         model: torch.nn.Module,
         loss_fn, 
         optimizer_factory,
-        lr_scheduler_factory=None,
-        schedule_config=None,
-        total_steps=None,
-        logger=None,
-        count_tokens=False,
-        pad_token_id=None,
+        lr_scheduler_factory = None,
+        schedule_config = None,
+        total_steps = None,
+        logger = None,
+        count_tokens = False,
+        pad_token_id = None,
         eval_perplexity = False,
         world_size = 1,
-
     ) -> Trainer:
     optim = optimizer_factory(model, config=config.optimizer)
 
@@ -41,6 +40,7 @@ def build_trainer(
         precision=config.precision,
         eval_perplexity=eval_perplexity,
         world_size=world_size,
+        max_grad_norm=config.max_grad_norm
     )
 
 def build_dataset(config: DataConfig):

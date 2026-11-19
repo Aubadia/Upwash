@@ -12,6 +12,11 @@ Read [docs/Architecture.md](docs/Architecture.md) and the relevant source and te
 - Verify recorded progress against the current files and test results before continuing. Distinguish agreed behavior, implementation progress, and verified test outcomes.
 - After advancing a task, update its roadmap entry and the progress overview with the actual result, blockers, and next action. Record test commands and failure causes; do not mark unrun tests as passing or an environment failure as the intended Red.
 
+## Compute on nano4
+
+- Submit all compute-intensive workloads on nano4 through Slurm with `sbatch`. This includes CPU- and GPU-intensive training, evaluation, benchmarks, data processing, and tests.
+- Store Slurm batch scripts under the repository's `scripts/` directory. From the repository root, submit a script with `sbatch scripts/<job>.sbatch`.
+
 ## Ownership and Editing Boundaries
 
 - The user owns production interfaces, implementation, and refactoring.
