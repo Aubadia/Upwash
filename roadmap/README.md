@@ -23,7 +23,32 @@ before launching the affected runs.
 
 ## Resume Here
 
-Current task (2026-11-14): [025 — Option-B initialization for the HF Llama](025-llama-initialization.md), on branch `feat/llama-init` (PR #12) from `main` at `be696b0`.
+Current task (2026-11-19): [026 — Data-parallel training (DDP)](026-ddp.md), on branch `feat/ddp` from `origin/main` at `1faf6dc`.
+
+- Context: the previous lab ended. Before the next lab (data curation; Paloma 9-source macro BPB ≤ 1.25, scored by token count, all seeds 42), the optimizations vibe-coded on `experiment` are moved to `main` by hand, one task at a time, starting with DDP. `experiment` is the behavioral reference.
+- Agreed (steps 1–2):
+  - `RankShard(dataset, *, rank, world_size, batch_size)` gives rank r the r-th block of every global batch. It rejects partial global batches and invalid ranks.
+  - `Trainer(..., world_size=1)` and `build_trainer(..., world_size=1)` report global token counts and rates. The update is unchanged.
+- Red: `test_rank_shard.py` fails at collection on the missing `RankShard`. `test_trainer_world_size.py` gives `8 failed`, all `TypeError` on the `world_size` keyword. The rest of the suite: `348 passed in 199.60s`.
+- Open for steps 3–4: where `Runtime` lives (recommended: `core/runtime.py`), and whether gradient clipping moves before the DDP integration test.
+- Green (2026-11-19): steps 1–2 implemented by the user; `./test.sh` → `368 passed in 116.32s`.
+- Decided (2026-11-19):
+  - `Runtime` lives in `core/runtime.py`.
+  - Gradient clipping moves later. The DDP test runs without it, and `main` must not run real experiments before clipping moves.
+- Red (step 3):
+  - `tests/unit/core/test_runtime.py` fails at collection on the missing module.
+  - `tests/integration/test_runtime_process_group.py` (a real 2-process gloo group) gives `1 failed in 10.08s`, with the same cause.
+- Green (step 3): `core/runtime.py` implemented by the user; `./test.sh` → `380 passed in 103.49s`.
+- Red (step 4, `train()` wiring):
+  - `tests/unit/test_train_ddp.py` gives `4 failed, 2 passed`.
+  - `tests/integration/test_ddp_training.py` (2 real gloo ranks vs 1 process, atol 5e-4 measured, no clipping) gives `1 failed`: 8 updates per rank, not 4.
+- Green (step 4): `train()` DDP wiring implemented by the user; 2-rank gloo equivalence passes; `./test.sh` → `387 passed in 55.31s`.
+- Step 5 (8-GPU smoke, Slurm job 812253): passed.
+  - All ranks on distinct GPUs, bit-identical replicas, a rank-0-only logger, global token counts, teardown on every rank.
+  - 1.69M tokens/s on 8 GPUs vs 228k on 1 GPU: 7.43×, 93% efficiency (150M, no compile, no FA3).
+- Next: commit and open the DDP PR. Then a separate branch from `main` for JSON/TOML run configs and the command-line entry point.
+
+Previous task (2026-11-14): [025 — Option-B initialization for the HF Llama](025-llama-initialization.md), on branch `feat/llama-init` (PR #12) from `main` at `be696b0`.
 
 - Merged `origin/main` at `412b09b` (PR #13, training entry point) on 2026-11-14.
   - Renumbered this task from 024 to 025, because PR #13's training entry point took 024.

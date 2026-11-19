@@ -67,10 +67,13 @@ class Trainer:
         pad_token_id=None,
         eval_steps=None,
         precision="fp32",
-        eval_perplexity=False
+        eval_perplexity=False,
+        world_size=1,
     ):
         if precision not in ("fp32", "bf16"):
             raise ValueError(f"precision must be 'fp32' or 'bf16', got {precision!r}")
+        if not isinstance(world_size, int) or world_size <=0:
+            raise ValueError(f"world_size must be an integer greater than 0, got {world_size}")
         self.state = TrainingState()
         self.model = model
         self.loss_fn = loss_fn
@@ -84,6 +87,7 @@ class Trainer:
         self._total_tokens_seen = 0
         self.precision = precision
         self.eval_perplexity = eval_perplexity
+        self.world_size = world_size
 
     def compute_loss(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         predictions = self.model(inputs)
@@ -179,6 +183,7 @@ class Trainer:
             if self.pad_token_id is None
             else torch.count_nonzero(inputs != self.pad_token_id)
         )
+        tokens *= self.world_size
         self._total_tokens_seen += tokens
         return tokens
 
