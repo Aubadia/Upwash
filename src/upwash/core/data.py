@@ -136,6 +136,41 @@ class PackedTokenDataset:
         return chunk[:-1], chunk[1:]
 
 
+class RankShard:
+    def __init__(self, dataset, *, rank, world_size, batch_size):
+        if world_size <= 0:
+            raise ValueError(f"world size must be an interger greater than 0, got {world_size}")
+        if batch_size <= 0:
+            raise ValueError(f"batch size must be an interger greater than 0, got {batch_size}")
+        if rank < 0 or rank >= world_size:
+            raise ValueError(f"rank must be in [0, {world_size}), got {rank}")    
+        if len(dataset) % (world_size * batch_size) != 0:
+            raise ValueError(
+                f"{len(dataset)} samples do not fill whole global batches of "
+                f"{world_size * batch_size} ({world_size} ranks x {batch_size}); "
+                f"every rank must run the same number of updates"
+            )
+        self.dataset = dataset
+        self.rank = rank
+        self.world_size = world_size
+        self.batch_size = batch_size
+        
+    def __len__(self):
+        return len(self.dataset) // self.world_size
+    
+    def __getitem__(self, i):
+        n = len(self)
+        if i < 0:
+            i += n
+        if i < 0 or i >= n:
+            raise IndexError(f"index {i} out of range for {n} samples")
+        
+        (batch, pos) = divmod(i, self.batch_size)
+        index = batch * self.world_size * self.batch_size + self.rank * self.batch_size + pos
+        return self.dataset[index]
+
+
+
 def load_dataset(repo_id, *, revision, data_files, columns, cache_dir=None
                  , download=snapshot_download):
     local_dir = download(repo_id, repo_type="dataset", revision=revision, allow_patterns=data_files, cache_dir=cache_dir)

@@ -17,6 +17,7 @@ def build_trainer(
         count_tokens=False,
         pad_token_id=None,
         eval_perplexity = False,
+        world_size = 1,
 
     ) -> Trainer:
     optim = optimizer_factory(model, config=config.optimizer)
@@ -39,6 +40,7 @@ def build_trainer(
         eval_steps=config.eval_steps,
         precision=config.precision,
         eval_perplexity=eval_perplexity,
+        world_size=world_size,
     )
 
 def build_dataset(config: DataConfig):

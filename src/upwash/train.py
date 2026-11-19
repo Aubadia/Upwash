@@ -2,15 +2,17 @@ from dataclasses import dataclass
 from functools import partial
 
 import torch
+import torch.distributed as dist
 
 from upwash.adaptor import build_llama_model, causal_lm_loss
 from upwash.builder import build_dataset, build_trainer
 from upwash.components.optimizers.muon_adamw import build_muon_adamw
 from upwash.components.schedulers.wsd import build_wsd_scheduler
 from upwash.config import RunConfig
-from upwash.core.data import DataLoader
+from upwash.core.data import DataLoader, RankShard
 from upwash.core.state import TrainingState
 from upwash.core.logger import FlockLogger
+from upwash.core.runtime import setup_runtime, teardown_runtime
 
 
 @dataclass
@@ -20,32 +22,46 @@ class TrainResult:
 
 
 def train(config: RunConfig) -> TrainResult:
-    torch.manual_seed(config.seed)
+    runtime = setup_runtime(config.device)
+    logger = None
+    try:
+        torch.manual_seed(config.seed)
 
-    train_loader = DataLoader(
-        build_dataset(config.train_data),
-        batch_size=config.batch_size,
-        drop_last=False,
-    )
-    eval_loader = (
-        DataLoader(
-            build_dataset(config.eval_data),
-            batch_size=config.eval_batch_size,
+        train_dataset = build_dataset(config.train_data)
+        if runtime.world_size > 1:
+            train_dataset = RankShard(train_dataset, rank=runtime.rank, world_size=runtime.world_size,
+                    batch_size=config.batch_size)
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=config.batch_size,
             drop_last=False,
         )
-        if config.eval_data is not None
-        else None
-    )
+        eval_loader = (
+            DataLoader(
+                build_dataset(config.eval_data),
+                batch_size=config.eval_batch_size,
+                drop_last=False,
+            )
+            if config.eval_data is not None
+            else None
+        )
 
-    model = build_llama_model(config.model).to(config.device)
-    logger = None
-    if config.logging is not None:
-        logger = FlockLogger(project=config.logging.project, name=config.logging.name)
+        model = build_llama_model(config.model).to(runtime.device)
 
-    try:
+        trained = model
+        if runtime.world_size > 1:
+            trained = torch.nn.parallel.DistributedDataParallel(
+                model,
+                device_ids=[torch.device(runtime.device).index] if runtime.device.startswith("cuda") else None,
+                forward_sync_buffers=False,
+            )
+
+        if config.logging is not None and runtime.is_main:
+            logger = FlockLogger(project=config.logging.project, name=config.logging.name)
+
         trainer = build_trainer(
             config=config.training,
-            model=model,
+            model=trained,
             loss_fn=causal_lm_loss,
             optimizer_factory=partial(build_muon_adamw, model_config=config.model),
             lr_scheduler_factory=build_wsd_scheduler,
@@ -54,10 +70,14 @@ def train(config: RunConfig) -> TrainResult:
             logger=logger,
             count_tokens=True,
             eval_perplexity=True,
+            world_size=runtime.world_size,
         )
         state = trainer.train(train_loader, eval_batches=eval_loader)
+        if runtime.world_size > 1:
+            dist.barrier()
         return TrainResult(model=model, state=state)
     finally:
         if logger is not None:
             # logger can automatically handle this, but add additional protection for safe
             logger.finish()
+        teardown_runtime(runtime)
