@@ -15,6 +15,17 @@ from upwash.core.logger import FlockLogger
 from upwash.core.runtime import setup_runtime, teardown_runtime
 
 
+class _CausalLMObject(torch.nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+
+    def forward(self, inputs, targets):
+        output = self.model(inputs)
+        loss = causal_lm_loss(output, targets)
+        return loss
+
+
 @dataclass
 class TrainResult:
     model: torch.nn.Module
@@ -52,14 +63,17 @@ def train(config: RunConfig) -> TrainResult:
         )
 
         model = build_llama_model(config.model).to(runtime.device)
-
-        if config.compile_model:
-            model.compile(mode=config.compile_mode)
-
         trained = model
+        
+        if config.compile_scope == "model":
+            model.compile(mode=config.compile_mode)
+        elif config.compile_scope == "objective":
+            trained = _CausalLMObject(model)
+            trained.compile(mode=config.compile_mode)
+        
         if runtime.world_size > 1:
             trained = torch.nn.parallel.DistributedDataParallel(
-                model,
+                trained,
                 device_ids=[torch.device(runtime.device).index] if runtime.device.startswith("cuda") else None,
                 forward_sync_buffers=False,
             )
@@ -70,7 +84,7 @@ def train(config: RunConfig) -> TrainResult:
         trainer = build_trainer(
             config=config.training,
             model=trained,
-            loss_fn=causal_lm_loss,
+            loss_fn=None if config.compile_scope == "objective" else causal_lm_loss,
             optimizer_factory=partial(build_muon_adamw, model_config=config.model),
             lr_scheduler_factory=build_wsd_scheduler,
             schedule_config=config.schedule,

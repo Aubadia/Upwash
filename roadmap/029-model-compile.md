@@ -136,8 +136,8 @@ diagnostic ran locally with `CUDA_VISIBLE_DEVICES=''`, `OMP_NUM_THREADS=2`,
 `TORCHINDUCTOR_COMPILE_THREADS=1`, and `PYTHONPATH=src:tests/integration` via
 `.venv/bin/python` on a temporary script. Both corrected runs exited 0.
 
-The proposal is pending agreement. The integration test still uses its
-existing absolute tolerance and remains Red.
+At this point the integration test still used its existing absolute tolerance
+and remained Red. The approved criterion appears below.
 
 ## Muon orthogonalization precision diagnostic — 2026-11-20
 
@@ -160,7 +160,7 @@ reduce eager/compiled disagreement on this workload. FP32 optimizer behavior,
 GPU throughput, and convergence are outside this diagnostic. Repository
 production code and the failing integration assertion were left as-is.
 
-## Agreed follow-up — Compile model and loss together
+## Initial objective-scope design — Superseded by the single switch below
 
 `RunConfig.compile_scope="model"` preserves current model-only
 behavior when compilation is enabled. With `compile_scope="objective"`,
@@ -194,3 +194,106 @@ Exit 1, **1 failed, 94 passed in 4.86s**. The new case stops at
 Its execution and update assertions have yet to run. The earlier compiled DDP
 numerical Red was not rerun. Next, the user adds the config field and routes
 the objective callable, then rerun this regression to verify Green.
+
+## Agreed single compile switch — 2026-11-20
+
+`RunConfig.compile_scope` alone selects eager (`"none"`, the default), compiled
+model forward (`"model"`), or compiled forward and loss (`"objective"`).
+`compile_mode` keeps selecting the PyTorch mode. Remove `compile_model` from
+the config and entry-point dispatch. Trainer results still return the original
+model.
+
+The CPU tests now exercise the three scopes, the default scope, and mode
+forwarding. The DDP case passes its scope to the constructor and verifies that
+each model-scope rank invokes the real compiler before comparing parameters.
+This prevents accidental eager execution from satisfying the compiled case.
+
+```sh
+CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 TORCHINDUCTOR_COMPILE_THREADS=1 PYTHONDONTWRITEBYTECODE=1 ./test.sh -p no:cacheprovider --tb=short tests/unit/test_train.py tests/unit/test_train_ddp.py tests/unit/test_llama_init.py tests/unit/test_adaptor.py tests/unit/test_model_config.py tests/integration/test_ddp_training.py
+```
+
+Exit 1, **5 failed, 95 passed in 25.69s**, with local loopback socket access.
+The user has added `compile_scope` with default `"objective"`, while `train()`
+still checks `compile_model`. One failure is the config default, two are the
+model modes that went eager, one is the objective that went eager, and one is
+the DDP case where neither rank invoked the compiler. Both eager DDP cases
+passed. The compiled DDP numerical assertion has not been reached with the
+new API, and its prior tolerance issue remains open.
+
+Next, the user makes `compile_scope` the sole switch with default `"none"`
+and routes the model and objective scopes. Rerun the command to verify wiring
+and reach the compiled DDP numerical assertion.
+
+### Verification after adding the objective wrapper — 2026-11-20
+
+The user removed the old boolean and added scope dispatch and an objective
+wrapper. Running the same unit regression command from the first objective
+Red gives exit 1, **11 failed, 86 passed in 5.94s**. Explicit eager and both
+model-mode cases pass. The default remains `"objective"`, so default callers
+also enable the wrapper. `Trainer.compute_loss()` still calls `model(inputs)`;
+the wrapper requires `(inputs, targets)`, so the objective path raises
+`TypeError` before producing a loss. Source inspection also shows that the
+objective branch overwrites `model`, which `TrainResult` returns.
+
+Next, change the scope default to `"none"`, keep the wrapper in `trained`, and
+route both inputs and targets through `compute_loss()` for the objective.
+Real two-rank tests were not rerun for this check.
+
+### Verification after restoring default eager — 2026-11-20
+
+The user set the default scope to `"none"` and retained the original model
+separately from the objective wrapper. The first objective Red unit command
+now gives **1 failed, 96 passed in 4.48s**, exit 1. Only the objective case
+fails. `Trainer.compute_loss()` still calls the wrapper with inputs alone,
+raising `TypeError: _CausalLMObject.forward() missing 1 required positional
+argument: 'targets'`. The entry point still passes `causal_lm_loss` to Trainer.
+Source inspection also shows that DDP wraps the original model instead of the
+selected training module. Real two-rank tests were not rerun.
+
+Next, have the objective path pass `loss_fn=None` and use `model(inputs,
+targets)` for that case in `compute_loss()`. Have DDP wrap `trained` so the
+selected objective path also works across ranks.
+
+The user subsequently changed DDP to wrap `trained`. The focused command
+`CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 ./test.sh -p no:cacheprovider --tb=short tests/unit/test_train.py -k compiles_model_and_loss`
+still exits 1 with **1 failed, 12 deselected in 8.07s** for missing `targets`.
+The remaining loss dispatch is at the `build_trainer()` call and at the start
+of `Trainer.compute_loss()`. Multi-rank execution was not rerun.
+
+### Objective scope Green — 2026-11-20
+
+The user wired `loss_fn=None` for the objective path. `Trainer.compute_loss()`
+now passes inputs and targets to that wrapper. The unit command from the
+first objective Red exits 0 with **97 passed in 4.62s**.
+
+The single-process FP32 smoke ran the real `train()` entry point with scopes
+`"none"` and `"objective"`, each on the same seeded tiny Llama. Each run used
+one batch of five packed sequences, one optimizer update, and a scheduled
+evaluation on eight held-out tokens. Both returned an HF Llama. The resulting
+parameters agree within `rtol=1e-4, atol=1e-5`, and the reported eval loss is
+identical. The Python stdin command used
+`CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 TORCHINDUCTOR_COMPILE_THREADS=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/python -`
+and exited 0. No GPU run or objective-scope two-rank run was performed.
+
+```sh
+CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 TORCHINDUCTOR_COMPILE_THREADS=1 PYTHONDONTWRITEBYTECODE=1 ./test.sh -p no:cacheprovider --tb=short
+```
+
+The full CPU suite with local loopback access exits 1 with **403 passed,
+1 failed in 31.03s**. The single-switch model-scope DDP case reaches the same
+numerical assertion as before. `gate_proj.weight` differs at 2 of 512 elements
+above the existing `5e-4` absolute tolerance, with maximum `6.40780e-4`.
+The relative-update criterion was pending agreement at this point.
+
+### Agreed compiled DDP acceptance — 2026-11-20
+
+The user approved relative L2 update error of at most `1%` globally and `2%`
+per parameter tensor for the four-update CPU compiled-model case. Each error
+is normalized by the eager update from the shared initial parameters. The
+eager DDP absolute tolerance remains `5e-4`. Both DDP paths still require
+bit-identical replicas, four updates, and process-group teardown.
+
+Reran the full CPU suite using the command above with local loopback access.
+Exit 0, **404 passed in 29.43s**. This verifies model-scope DDP under the
+approved limits and the existing eager cases. Objective-scope multi-rank
+execution and GPU throughput remain unverified.

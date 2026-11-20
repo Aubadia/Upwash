@@ -26,8 +26,14 @@ before launching the affected runs.
 Current task (2026-11-20): [029 — Opt-in model compilation](029-model-compile.md)
 on `feat/acceleration`.
 
-- Agreed: `RunConfig(compile_model=False, compile_mode="default")`. Enabled
-  runs use the compiled forward in Trainer and retain the original result model.
+- Agreed: `RunConfig.compile_scope` alone selects `"none"` (default eager),
+  `"model"` (compiled forward), or `"objective"` (compiled forward and loss).
+  `compile_mode` selects the PyTorch mode. The old boolean is superseded.
+- Objective scope Green: `97 passed` in the targeted CPU regression. A real
+  single-process CPU Inductor smoke matches eager after one update and one
+  evaluation. Full CPU suite: `404 passed in 29.43s`, including model-scope
+  DDP with the approved update-error limits. Objective multi-rank and GPU
+  performance remain unverified.
 - First Red: `2 failed, 92 passed in 4.51s`. Both enabled cases fail at the
   missing `RunConfig.compile_model` keyword. The eager case passes.
 - Green: the user added the config fields and in-place `model.compile()` before
@@ -39,18 +45,17 @@ on `feat/acceleration`.
   compiled and eager parameters exceed the existing `5e-4` absolute threshold
   at `gate_proj.weight`. The same difference reproduces with a single process.
   See task 029 for the comparisons. GPU execution remains unverified.
-- Proposed for this compiled CPU case: relative L2 update error at most `1%`
+- Agreed for the compiled CPU case: relative L2 update error at most `1%`
   globally and `2%` per tensor. Compiled DDP measured `0.192353%` globally and
   `1.023451%` in the worst tensor at token seed 0, with smaller errors at
-  seed 1. Await agreement before changing the Red assertion.
+  seed 1. Eager DDP retains its original absolute tolerance.
 - A four-update CPU diagnostic changed only Muon's orthogonalization cast in
   a temporary process. FP32 reduced the maximum eager/compiled parameter gap
-  from `6.40780e-4` to `1.01328e-6`. The stock Muon training path and its Red
-  integration assertion retain the existing precision and acceptance check.
-- Agreed: `compile_scope="model"` defaults to model-only compilation, and
-  `"objective"` compiles the model and loss together when enabled. The first
-  Upwash objective test is Red at the missing `compile_scope` keyword
-  (`1 failed, 94 passed`). Next: implement the opt-in entry-point wiring.
+  from `6.40780e-4` to `1.01328e-6`. The stock Muon training path retains BF16
+  orthogonalization.
+- The initial objective test was Red at the missing `compile_scope` keyword
+  (`1 failed, 94 passed`). The single-switch contract above replaces the
+  original two-field proposal.
 
 Previous task (2026-11-20): [028 — Disable the training KV cache](028-training-kv-cache.md)
 on `feat/acceleration`, based on `main` at `e2efe61`.

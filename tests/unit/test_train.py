@@ -57,14 +57,23 @@ def test_run_config_rejects_a_partial_training_sequence(tmp_path, make_optimizer
         make_run_config(tmp_path, make_optimizer_config, train_data=data)
 
 
+def test_run_config_defaults_to_eager_with_only_one_compile_switch(tmp_path, make_optimizer_config):
+    config = make_run_config(tmp_path, make_optimizer_config)
+
+    assert config.compile_scope == "none"
+    with pytest.raises(TypeError, match="compile_model"):
+        make_run_config(tmp_path, make_optimizer_config, compile_model=True)
+
+
 @pytest.mark.parametrize(
     ("compile_options", "expected_mode"),
     [
         ({}, None),
-        ({"compile_model": True}, "default"),
-        ({"compile_model": True, "compile_mode": "reduce-overhead"}, "reduce-overhead"),
+        ({"compile_scope": "none", "compile_mode": "reduce-overhead"}, None),
+        ({"compile_scope": "model"}, "default"),
+        ({"compile_scope": "model", "compile_mode": "reduce-overhead"}, "reduce-overhead"),
     ],
-    ids=["eager-by-default", "default-mode", "explicit-mode"],
+    ids=["eager-by-default", "eager-with-mode", "default-mode", "explicit-mode"],
 )
 def test_train_uses_model_compilation_only_when_enabled(
     tmp_path, make_optimizer_config, monkeypatch, compile_options, expected_mode,
@@ -79,7 +88,7 @@ def test_train_uses_model_compilation_only_when_enabled(
     inputs = torch.tensor([1.0])
     expected_output = inputs if expected_mode is None else inputs + 1
 
-    def compile_model(module, *, mode=None, **kwargs):
+    def compile_forward(module, *, mode=None, **kwargs):
         compile_calls.append(mode)
         return lambda inputs: module(inputs) + 1
 
@@ -91,7 +100,7 @@ def test_train_uses_model_compilation_only_when_enabled(
         return SimpleNamespace(train=train)
 
     monkeypatch.setattr(entry, "build_llama_model", lambda config: model)
-    monkeypatch.setattr(torch, "compile", compile_model)
+    monkeypatch.setattr(torch, "compile", compile_forward)
     monkeypatch.setattr(entry, "build_trainer", build_trainer)
 
     with torch.random.fork_rng(devices=[]):
@@ -108,7 +117,7 @@ def test_train_compiles_model_and_loss_together_in_objective_scope(
     entry = importlib.import_module("upwash.train")
     config = make_run_config(
         tmp_path, make_optimizer_config,
-        batch_size=5, compile_model=True, compile_scope="objective",
+        batch_size=5, compile_scope="objective",
     )
     in_compiled_call = False
     calls = []

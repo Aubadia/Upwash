@@ -158,8 +158,8 @@ class RunConfig:
     device: str = "cpu"
     seed: int = 0
     logging: LoggingConfig | None = None
-    compile_model: bool = False
     compile_mode: str = "default"
+    compile_scope: str = "none"    # none, model, objective
 
     def __post_init__(self):
         for name in ("batch_size", "eval_batch_size"):

@@ -12,10 +12,14 @@ Tolerance, measured 2026-11-19 with a scratch reference composition of main's co
   gradients can move a matrix by a bf16-quantized step. AdamW parameters differ by ~1e-6;
 - the smallest training movement is 3.4e-2.
 atol 5e-4 is ~4x the largest observed difference and ~70x below the movement.
+The compiled case instead compares relative L2 parameter updates from the
+same initialization, with limits of 1% globally and 2% per parameter tensor.
 """
+import math
 import multiprocessing
 import os
 import socket
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -23,9 +27,11 @@ import torch
 
 WORLD_SIZE = 2
 ATOL = 5e-4
+GLOBAL_UPDATE_RTOL = 0.01
+PARAMETER_UPDATE_RTOL = 0.02
 
 
-def make_config(root, *, batch_size, make_optimizer_config, max_grad_norm):
+def make_config(root, *, batch_size, make_optimizer_config, max_grad_norm, compile_scope="none"):
     from upwash.config import DataConfig, ModelConfig, RunConfig, ScheduleConfig, TrainingConfig
 
     return RunConfig(
@@ -40,6 +46,7 @@ def make_config(root, *, batch_size, make_optimizer_config, max_grad_norm):
         ),
         schedule=ScheduleConfig(warmup_ratio=0.25, decay_ratio=0.5, decay_shape="power", decay_power=1.0),
         batch_size=batch_size, eval_batch_size=1, device="cpu", seed=11, logging=None,
+        compile_scope=compile_scope,
     )
 
 
@@ -57,7 +64,10 @@ def run_rank(rank, port, config, queue):
         import torch.distributed as dist
         from upwash.train import train
 
-        result = train(config)
+        with patch.object(torch, "compile", wraps=torch.compile) as compiler:
+            result = train(config)
+        if config.compile_scope == "model":
+            assert compiler.called, "model-scope training never invoked torch.compile"
         # numpy copies: shared-memory tensors do not survive the child's exit.
         queue.put((rank, {n: p.detach().numpy().copy() for n, p in result.model.named_parameters()},
                    result.state.global_step, dist.is_initialized()))
@@ -76,12 +86,12 @@ def token_root(tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("max_grad_norm", "compile_model"),
-    [(None, False), (0.1, False), (None, True)],
+    ("max_grad_norm", "compile_scope"),
+    [(None, "none"), (0.1, "none"), (None, "model")],
     ids=["no-clipping", "clipping", "compiled-model"],
 )
 def test_two_ranks_match_one_process_on_the_global_batch(
-    token_root, make_optimizer_config, monkeypatch, max_grad_norm, compile_model,
+    token_root, make_optimizer_config, monkeypatch, max_grad_norm, compile_scope,
 ):
     from upwash.adaptor import build_llama_model
     from upwash.train import train
@@ -101,8 +111,8 @@ def test_two_ranks_match_one_process_on_the_global_batch(
     # Per-rank batch 2 on each of two ranks: the same global batch of 4.
     config = make_config(
         token_root, batch_size=2, make_optimizer_config=make_optimizer_config, max_grad_norm=max_grad_norm,
+        compile_scope=compile_scope,
     )
-    config.compile_model = compile_model
     context = multiprocessing.get_context("spawn")
     queue = context.Queue()
     port = free_port()
@@ -125,10 +135,30 @@ def test_two_ranks_match_one_process_on_the_global_batch(
         assert steps == reference.state.global_step == 4
         assert parameters.keys() == expected.keys()  # unwrapped: no "module." prefix
         assert not still_initialized  # train() tore down the group it created
-    for name in expected:
+    total_squared_error = 0.0
+    total_squared_update = 0.0
+    for name, eager in expected.items():
         # DDP keeps replicas identical.
         np.testing.assert_array_equal(results[0][0][name], results[1][0][name], err_msg=name)
-        torch.testing.assert_close(torch.from_numpy(results[0][0][name]), expected[name],
-                                   rtol=0, atol=ATOL, msg=lambda message: f"{name}\n{message}")
-        assert (expected[name] - initial[name]).abs().max() > 10 * ATOL, f"{name} barely trained"
+        actual = torch.from_numpy(results[0][0][name])
+        assert (eager - initial[name]).abs().max() > 10 * ATOL, f"{name} barely trained"
+        if compile_scope == "none":
+            torch.testing.assert_close(actual, eager, rtol=0, atol=ATOL,
+                                       msg=lambda message: f"{name}\n{message}")
+            continue
+
+        squared_error = (actual.double() - eager.double()).square().sum().item()
+        squared_update = (eager.double() - initial[name].double()).square().sum().item()
+        relative_error = math.sqrt(squared_error / squared_update)
+        assert relative_error <= PARAMETER_UPDATE_RTOL, (
+            f"{name} update error {relative_error:.4%} exceeds {PARAMETER_UPDATE_RTOL:.0%}"
+        )
+        total_squared_error += squared_error
+        total_squared_update += squared_update
+
+    if compile_scope != "none":
+        relative_error = math.sqrt(total_squared_error / total_squared_update)
+        assert relative_error <= GLOBAL_UPDATE_RTOL, (
+            f"global update error {relative_error:.4%} exceeds {GLOBAL_UPDATE_RTOL:.0%}"
+        )
     assert all(process.exitcode == 0 for process in processes)
