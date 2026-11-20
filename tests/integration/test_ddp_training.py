@@ -1,7 +1,8 @@
 """Two real gloo ranks through train() match one process on the global batch (task 026, step 4).
 
 Each rank trains a tiny real Llama with Muon + AdamW and WSD on a per-rank batch of 2,
-the single process on a batch of 4. The comparison runs with and without gradient clipping.
+the single eager process on a batch of 4. The comparison covers gradient
+clipping and model compilation in separate cases.
 
 Tolerance, measured 2026-11-19 with a scratch reference composition of main's components
 (RankShard + DDP + build_trainer), no clipping:
@@ -74,9 +75,13 @@ def token_root(tmp_path):
     return tmp_path
 
 
-@pytest.mark.parametrize("max_grad_norm", [None, 0.1], ids=["no-clipping", "clipping"])
+@pytest.mark.parametrize(
+    ("max_grad_norm", "compile_model"),
+    [(None, False), (0.1, False), (None, True)],
+    ids=["no-clipping", "clipping", "compiled-model"],
+)
 def test_two_ranks_match_one_process_on_the_global_batch(
-    token_root, make_optimizer_config, monkeypatch, max_grad_norm,
+    token_root, make_optimizer_config, monkeypatch, max_grad_norm, compile_model,
 ):
     from upwash.adaptor import build_llama_model
     from upwash.train import train
@@ -97,6 +102,7 @@ def test_two_ranks_match_one_process_on_the_global_batch(
     config = make_config(
         token_root, batch_size=2, make_optimizer_config=make_optimizer_config, max_grad_norm=max_grad_norm,
     )
+    config.compile_model = compile_model
     context = multiprocessing.get_context("spawn")
     queue = context.Queue()
     port = free_port()
@@ -123,6 +129,6 @@ def test_two_ranks_match_one_process_on_the_global_batch(
         # DDP keeps replicas identical.
         np.testing.assert_array_equal(results[0][0][name], results[1][0][name], err_msg=name)
         torch.testing.assert_close(torch.from_numpy(results[0][0][name]), expected[name],
-                                   rtol=0, atol=ATOL, msg=name)
+                                   rtol=0, atol=ATOL, msg=lambda message: f"{name}\n{message}")
         assert (expected[name] - initial[name]).abs().max() > 10 * ATOL, f"{name} barely trained"
     assert all(process.exitcode == 0 for process in processes)

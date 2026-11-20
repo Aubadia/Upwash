@@ -27,11 +27,30 @@ Current task (2026-11-20): [029 — Opt-in model compilation](029-model-compile.
 on `feat/acceleration`.
 
 - Agreed: `RunConfig(compile_model=False, compile_mode="default")`. Enabled
-  runs pass the compiled model to Trainer and retain the original result model.
+  runs use the compiled forward in Trainer and retain the original result model.
 - First Red: `2 failed, 92 passed in 4.51s`. Both enabled cases fail at the
   missing `RunConfig.compile_model` keyword. The eager case passes.
-- Next: the user adds the config fields and compile wiring, then rerun the
-  entry-point regressions. Real compilation remains unverified.
+- Green: the user added the config fields and in-place `model.compile()` before
+  DDP. The test now verifies which forward Trainer invokes, and the targeted
+  CPU regressions report `94 passed in 4.64s`.
+- A real single-process CPU Inductor smoke also passes. One tiny Llama update
+  produces parameters within `rtol=1e-4, atol=1e-5` of eager.
+- Two compiled CPU ranks complete four updates with identical replicas. The
+  compiled and eager parameters exceed the existing `5e-4` absolute threshold
+  at `gate_proj.weight`. The same difference reproduces with a single process.
+  See task 029 for the comparisons. GPU execution remains unverified.
+- Proposed for this compiled CPU case: relative L2 update error at most `1%`
+  globally and `2%` per tensor. Compiled DDP measured `0.192353%` globally and
+  `1.023451%` in the worst tensor at token seed 0, with smaller errors at
+  seed 1. Await agreement before changing the Red assertion.
+- A four-update CPU diagnostic changed only Muon's orthogonalization cast in
+  a temporary process. FP32 reduced the maximum eager/compiled parameter gap
+  from `6.40780e-4` to `1.01328e-6`. The stock Muon training path and its Red
+  integration assertion retain the existing precision and acceptance check.
+- Agreed: `compile_scope="model"` defaults to model-only compilation, and
+  `"objective"` compiles the model and loss together when enabled. The first
+  Upwash objective test is Red at the missing `compile_scope` keyword
+  (`1 failed, 94 passed`). Next: implement the opt-in entry-point wiring.
 
 Previous task (2026-11-20): [028 — Disable the training KV cache](028-training-kv-cache.md)
 on `feat/acceleration`, based on `main` at `e2efe61`.

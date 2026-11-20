@@ -35,6 +35,7 @@ def train(config: RunConfig) -> TrainResult:
                 world_size=runtime.world_size,
                 batch_size=config.batch_size
             )
+        
         train_loader = DataLoader(
             train_dataset,
             batch_size=config.batch_size,
@@ -51,6 +52,9 @@ def train(config: RunConfig) -> TrainResult:
         )
 
         model = build_llama_model(config.model).to(runtime.device)
+
+        if config.compile_model:
+            model.compile(mode=config.compile_mode)
 
         trained = model
         if runtime.world_size > 1:

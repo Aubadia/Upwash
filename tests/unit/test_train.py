@@ -74,19 +74,22 @@ def test_train_uses_model_compilation_only_when_enabled(
     entry = importlib.import_module("upwash.train")
     config = make_run_config(tmp_path, make_optimizer_config, **compile_options)
     model = torch.nn.Identity()
-    compiled_model = torch.nn.Sequential(model)
     compile_calls = []
     state = TrainingState()
+    inputs = torch.tensor([1.0])
+    expected_output = inputs if expected_mode is None else inputs + 1
 
     def compile_model(module, *, mode=None, **kwargs):
-        compile_calls.append((module, mode))
-        return compiled_model
+        compile_calls.append(mode)
+        return lambda inputs: module(inputs) + 1
 
     def build_trainer(*, model, **kwargs):
-        assert model is expected_training_model
-        return SimpleNamespace(train=lambda *args, **kwargs: state)
+        def train(*args, **kwargs):
+            torch.testing.assert_close(model(inputs), expected_output)
+            return state
 
-    expected_training_model = model if expected_mode is None else compiled_model
+        return SimpleNamespace(train=train)
+
     monkeypatch.setattr(entry, "build_llama_model", lambda config: model)
     monkeypatch.setattr(torch, "compile", compile_model)
     monkeypatch.setattr(entry, "build_trainer", build_trainer)
@@ -94,9 +97,70 @@ def test_train_uses_model_compilation_only_when_enabled(
     with torch.random.fork_rng(devices=[]):
         result = entry.train(config)
 
-    assert compile_calls == ([] if expected_mode is None else [(model, expected_mode)])
+    assert compile_calls == ([] if expected_mode is None else [expected_mode])
     assert result.model is model
     assert result.state is state
+
+
+def test_train_compiles_model_and_loss_together_in_objective_scope(
+    tmp_path, make_optimizer_config, monkeypatch,
+):
+    entry = importlib.import_module("upwash.train")
+    config = make_run_config(
+        tmp_path, make_optimizer_config,
+        batch_size=5, compile_model=True, compile_scope="objective",
+    )
+    in_compiled_call = False
+    calls = []
+    compile_modes = []
+    original_loss = torch.nn.functional.cross_entropy
+
+    class TinyLM(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.embed_tokens = torch.nn.Embedding(8, 8)
+
+        def forward(self, inputs):
+            calls.append(("model", in_compiled_call))
+            return SimpleNamespace(logits=self.embed_tokens(inputs))
+
+    def loss(*args, **kwargs):
+        calls.append(("loss", in_compiled_call))
+        return original_loss(*args, **kwargs)
+
+    def record_compiled_call(function):
+        def compiled(*args, **kwargs):
+            nonlocal in_compiled_call
+            in_compiled_call = True
+            try:
+                return function(*args, **kwargs)
+            finally:
+                in_compiled_call = False
+
+        return compiled
+
+    def compile_objective(function, *, mode=None, **kwargs):
+        compile_modes.append(mode)
+        if isinstance(function, torch.nn.Module):
+            # Preserve the module interface when the compiler receives a module.
+            monkeypatch.setattr(function, "forward", record_compiled_call(function.forward))
+            return function
+        return record_compiled_call(function)
+
+    with torch.random.fork_rng(devices=[]):
+        torch.manual_seed(0)
+        model = TinyLM()
+        initial_weight = model.embed_tokens.weight.detach().clone()
+        monkeypatch.setattr(entry, "build_llama_model", lambda config: model)
+        monkeypatch.setattr(torch.nn.functional, "cross_entropy", loss)
+        monkeypatch.setattr(torch, "compile", compile_objective)
+        result = entry.train(config)
+
+    assert compile_modes == ["default"]
+    assert calls == [("model", True), ("loss", True)]
+    assert result.state.global_step == 1
+    assert result.model is model
+    assert not torch.equal(model.embed_tokens.weight, initial_weight)
 
 
 def test_train_runs_the_entire_budget_including_the_final_partial_batch(
