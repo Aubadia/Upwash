@@ -122,3 +122,11 @@ def test_training_config_precision_defaults_to_fp32(make_optimizer_config):
 
 def test_training_config_exposes_bf16_precision(make_optimizer_config):
     assert TrainingConfig(optimizer=make_optimizer_config(), precision="bf16").precision == "bf16"
+
+
+@pytest.mark.parametrize("max_grad_norm", [0.0, -1.0, float("nan"), float("inf"), float("-inf")])
+def test_training_config_rejects_invalid_gradient_clipping_threshold(
+    make_optimizer_config, max_grad_norm,
+):
+    with pytest.raises(ValueError, match="max_grad_norm"):
+        TrainingConfig(optimizer=make_optimizer_config(), max_grad_norm=max_grad_norm)

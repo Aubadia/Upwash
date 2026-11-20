@@ -23,7 +23,22 @@ before launching the affected runs.
 
 ## Resume Here
 
-Current task (2026-11-19): [026 — Data-parallel training (DDP)](026-ddp.md), on branch `feat/ddp` from `origin/main` at `1faf6dc`.
+Current task (2026-11-20): [027 — Gradient clipping](027-gradient-clipping.md)
+on `feat/grad_clip`, based on `main` at `73b1875`.
+
+- Agreed: optional `max_grad_norm`, global L2 clipping between backward and
+  the optimizer step, and pre-clip norm logging.
+- First Red: the CPU clipping integration and related regressions give
+  `1 failed, 77 passed in 11.92s`. The new case stops at the unsupported
+  `TrainingConfig.max_grad_norm` keyword. See task 027 for the command.
+- Green: the targeted CPU regression passes all 87 cases, including
+  invalid thresholds, disabled clipping with an overflowing norm, clipping
+  without a logger, pre-clip norm logging, and actual two-rank Gloo
+  equivalence with and without clipping.
+- The full suite and GPU runs were not repeated. The command and previous
+  failure causes are recorded in task 027.
+
+Previous task (2026-11-19): [026 — Data-parallel training (DDP)](026-ddp.md), on branch `feat/ddp` from `origin/main` at `1faf6dc`.
 
 - Context: the previous lab ended. Before the next lab (data curation; Paloma 9-source macro BPB ≤ 1.25, scored by token count, all seeds 42), the optimizations vibe-coded on `experiment` are moved to `main` by hand, one task at a time, starting with DDP. `experiment` is the behavioral reference.
 - Agreed (steps 1–2):

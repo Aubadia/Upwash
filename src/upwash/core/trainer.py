@@ -69,6 +69,7 @@ class Trainer:
         precision="fp32",
         eval_perplexity=False,
         world_size=1,
+        max_grad_norm=None,
     ):
         if precision not in ("fp32", "bf16"):
             raise ValueError(f"precision must be 'fp32' or 'bf16', got {precision!r}")
@@ -88,6 +89,7 @@ class Trainer:
         self.precision = precision
         self.eval_perplexity = eval_perplexity
         self.world_size = world_size
+        self.max_grad_norm = max_grad_norm
 
     def compute_loss(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         predictions = self.model(inputs)
@@ -157,16 +159,23 @@ class Trainer:
             loss = self.compute_loss(inputs, targets)
         loss.backward()
 
+        grad_norm = None
+
+        if self.max_grad_norm is not None:
+            grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
+
         metrics = {}
         if logging_enabled:
             metrics["train/learning_rate"] = float(self.optimizer.param_groups[0]["lr"])
-            grad_norms = [
-                parameter.grad.detach().norm(2)
-                for parameter in self.model.parameters()
-                if parameter.grad is not None
-            ]
+            if grad_norm is None:
+                grad_norms = [
+                    parameter.grad.detach().norm(2)
+                    for parameter in self.model.parameters()
+                    if parameter.grad is not None
+                ]
+                grad_norm = torch.stack(grad_norms).norm(2) if grad_norms else 0.0
             metrics["train/grad_norm"] = (
-                torch.stack(grad_norms).norm(2) if grad_norms else 0.0
+                grad_norm
             )
 
         self.optimizer.step()
