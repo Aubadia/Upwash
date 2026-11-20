@@ -161,6 +161,7 @@ class RunConfig:
     logging: LoggingConfig | None = None
     compile_mode: str = "default"
     compile_scope: str = "none"    # none, model, objective
+    attention_implementation: str | None = None
 
     def __post_init__(self):
         for name in ("batch_size", "eval_batch_size"):

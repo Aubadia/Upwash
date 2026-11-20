@@ -63,6 +63,10 @@ def train(config: RunConfig) -> TrainResult:
         )
 
         model = build_llama_model(config.model).to(runtime.device)
+        
+        if config.attention_implementation is not None:
+            model.set_attn_implementation(config.attention_implementation)
+
         trained = model
         
         if config.compile_scope == "model":

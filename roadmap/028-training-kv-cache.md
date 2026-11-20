@@ -28,8 +28,10 @@ Exit 1, **1 failed, 27 passed in 4.67s**. The forward succeeds, but returns
 Tests ran directly on the user's machine. The CPU Red has no execution blocker.
 In this session NVML reports GPU access blocked by the operating system and
 PyTorch reports CUDA unavailable. GPU acceptance was not run. The
-[FlashAttention-3 build used by the experiment](https://github.com/Dao-AILab/flash-attention/blob/f63c472c4dc19237c0635d6a629df065ff64796e/README.md#flashattention-3-beta-release)
-targets Hopper, so it is outside laptop acceptance.
+[FlashAttention-3 build used by the experiment](https://github.com/Aubadia/Upwash/blob/8718eb1/scripts/build_fa3.sbatch)
+disables SM8x kernels. The upstream source can include those kernels when
+built with different flags. See [031](031-flashattention-3.md) for laptop
+preflight results.
 
 Next, the user disables KV caching in the Llama training config, then rerun
 the targeted regression to verify Green.

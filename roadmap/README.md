@@ -23,7 +23,19 @@ before launching the affected runs.
 
 ## Resume Here
 
-Current task (2026-11-20): [030 — Fused AdamW](030-fused-adamw.md)
+Current task (2026-11-20): [031 — FlashAttention-3 selection](031-flashattention-3.md)
+on `feat/acceleration`.
+
+- Agreed: `RunConfig.attention_implementation=None`; apply explicit backends
+  after device placement and before compilation and DDP wrapping.
+- First Red: `1 failed, 41 passed`. The FA3 case stops at the missing config
+  keyword. Default selection and existing regressions pass.
+- Backend selection Green: `43 passed`. On the RTX 3080, real BF16 Llama
+  updates use SDPA by default and eager when requested.
+- Next: real FA3 acceptance requires the extension. The local CUDA 12.8
+  toolkit and PyTorch CUDA 13.2 build still prevent a source build.
+
+Previous task (2026-11-20): [030 — Fused AdamW](030-fused-adamw.md)
 on `feat/acceleration`.
 
 - Agreed: `OptimizerConfig.fused_adamw=False`. Opt-in enables the existing
