@@ -23,7 +23,21 @@ before launching the affected runs.
 
 ## Resume Here
 
-Current task (2026-11-20): [031 — FlashAttention-3 selection](031-flashattention-3.md)
+Current task (2026-11-20): [032 — CUDA batch prefetch](032-cuda-batch-prefetch.md)
+on `feat/acceleration`.
+
+- Green: `RunConfig.prefetch_to_device=True` enables one-batch lookahead for
+  the CUDA training loader. The default, CPU, and evaluation paths use the
+  ordinary loader.
+- RTX 3080 Laptop verification: `2 passed`. A separate probe confirmed pinned
+  asynchronous transfers on a dedicated copy stream and repeatable traversal.
+  Full CPU suite: `409 passed in 41.62s`.
+- Next: measure copy/compute overlap and throughput against the default loader.
+
+[Optimizer compilation](029-model-compile.md#deferred-optimizer-compilation--2026-11-20)
+is deferred after the Inductor Muon numerical diagnostic.
+
+Previous task (2026-11-20): [031 — FlashAttention-3 selection](031-flashattention-3.md)
 on `feat/acceleration`.
 
 - Agreed: `RunConfig.attention_implementation=None`; apply explicit backends

@@ -312,3 +312,33 @@ CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 TORCHINDUCTOR_COMPILE_THREADS=1 PYTHON
 
 Exit 0, **405 passed in 41.09s** with local loopback access. Objective-scope
 DDP CPU updates are verified. GPU execution and speed are unmeasured here.
+
+## Deferred optimizer compilation — 2026-11-20
+
+The experiment at `8718eb1` uses Inductor for `optimizer.step()` when
+all WSD group LRs equal their base rates. A standalone probe used the
+experiment's `compiled_update.py`, PyTorch `2.15.0+cu132`, independent
+`Linear(4, 3)` copies, and the Upwash Muon + AdamW factory. The six WSD
+factors were `0.5, 1, 1, 1, 0.5, 0`. All compiled candidates dispatched
+to the compiled step on updates 2 through 4.
+
+A strict initial CPU comparison exited 1 on the first compiled update with
+a maximum absolute Muon weight difference of `9.12771e-4`. Measuring all
+six updates gave these results. Relative L2 error is normalized by the
+eager update from the shared initialization.
+
+| Backend and gradient fixture | Final Muon update gap | Maximum absolute AdamW bias gap |
+| --- | ---: | ---: |
+| CPU Inductor, rank 2 | 37.9965% | `5.96e-8` |
+| RTX 3080 Inductor, rank 2 | 37.9965% | `2.98e-8` |
+| CPU `aot_eager`, rank 2 | 0% | `2.98e-8` |
+| CPU Inductor, rank 3 and fused AdamW | 0.737474% | `0` |
+| RTX 3080 Inductor, rank 3 and fused AdamW | 0.737474% | `0` |
+
+The measurement scripts ran via `.venv/bin/python` with `OMP_NUM_THREADS=2`,
+`TORCHINDUCTOR_COMPILE_THREADS=1`, `PYTHONDONTWRITEBYTECODE=1`, and
+`PYTHONPATH=src`. CPU used `CUDA_VISIBLE_DEVICES=''` and the laptop used
+`CUDA_VISIBLE_DEVICES=0`. Both measurement runs exited 0 after reporting
+their differences and checking dispatch. The user deferred optimizer
+compilation and chose [CUDA batch prefetch](032-cuda-batch-prefetch.md) as
+task 032.

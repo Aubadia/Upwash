@@ -9,7 +9,7 @@ from upwash.builder import build_dataset, build_trainer
 from upwash.components.optimizers.muon_adamw import build_muon_adamw
 from upwash.components.schedulers.wsd import build_wsd_scheduler
 from upwash.config import RunConfig
-from upwash.core.data import DataLoader, RankShard
+from upwash.core.data import CUDAPrefetchLoader, DataLoader, RankShard
 from upwash.core.state import TrainingState
 from upwash.core.logger import FlockLogger
 from upwash.core.runtime import setup_runtime, teardown_runtime
@@ -52,6 +52,8 @@ def train(config: RunConfig) -> TrainResult:
             batch_size=config.batch_size,
             drop_last=False,
         )
+        if config.prefetch_to_device and torch.device(runtime.device).type == "cuda":
+            train_loader = CUDAPrefetchLoader(train_loader, runtime.device)
         eval_loader = (
             DataLoader(
                 build_dataset(config.eval_data),

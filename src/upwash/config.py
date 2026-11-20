@@ -162,6 +162,7 @@ class RunConfig:
     compile_mode: str = "default"
     compile_scope: str = "none"    # none, model, objective
     attention_implementation: str | None = None
+    prefetch_to_device: bool = False
 
     def __post_init__(self):
         for name in ("batch_size", "eval_batch_size"):
