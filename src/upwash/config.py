@@ -9,6 +9,7 @@ class OptimizerConfig:
     adam_beta2: float
     adam_lr_multiplier: float
     weight_decay: float
+    fused_adamw: bool = False
 
     def __post_init__(self):
         if not (math.isfinite(self.lr) and self.lr >= 0):

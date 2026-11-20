@@ -2,7 +2,7 @@
 
 Each rank trains a tiny real Llama with Muon + AdamW and WSD on a per-rank batch of 2,
 the single eager process on a batch of 4. The comparison covers gradient
-clipping and model compilation in separate cases.
+clipping, model-only compilation, and objective compilation in separate cases.
 
 Tolerance, measured 2026-11-19 with a scratch reference composition of main's components
 (RankShard + DDP + build_trainer), no clipping:
@@ -12,7 +12,7 @@ Tolerance, measured 2026-11-19 with a scratch reference composition of main's co
   gradients can move a matrix by a bf16-quantized step. AdamW parameters differ by ~1e-6;
 - the smallest training movement is 3.4e-2.
 atol 5e-4 is ~4x the largest observed difference and ~70x below the movement.
-The compiled case instead compares relative L2 parameter updates from the
+The compiled cases compare relative L2 parameter updates from the
 same initialization, with limits of 1% globally and 2% per parameter tensor.
 """
 import math
@@ -66,8 +66,8 @@ def run_rank(rank, port, config, queue):
 
         with patch.object(torch, "compile", wraps=torch.compile) as compiler:
             result = train(config)
-        if config.compile_scope == "model":
-            assert compiler.called, "model-scope training never invoked torch.compile"
+        if config.compile_scope != "none":
+            assert compiler.called, f"{config.compile_scope} scope never invoked torch.compile"
         # numpy copies: shared-memory tensors do not survive the child's exit.
         queue.put((rank, {n: p.detach().numpy().copy() for n, p in result.model.named_parameters()},
                    result.state.global_step, dist.is_initialized()))
@@ -87,8 +87,8 @@ def token_root(tmp_path):
 
 @pytest.mark.parametrize(
     ("max_grad_norm", "compile_scope"),
-    [(None, "none"), (0.1, "none"), (None, "model")],
-    ids=["no-clipping", "clipping", "compiled-model"],
+    [(None, "none"), (0.1, "none"), (None, "model"), (None, "objective")],
+    ids=["no-clipping", "clipping", "compiled-model", "compiled-objective"],
 )
 def test_two_ranks_match_one_process_on_the_global_batch(
     token_root, make_optimizer_config, monkeypatch, max_grad_norm, compile_scope,

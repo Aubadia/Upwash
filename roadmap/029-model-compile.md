@@ -297,3 +297,18 @@ Reran the full CPU suite using the command above with local loopback access.
 Exit 0, **404 passed in 29.43s**. This verifies model-scope DDP under the
 approved limits and the existing eager cases. Objective-scope multi-rank
 execution and GPU throughput remain unverified.
+
+### Objective-scope DDP Green — 2026-11-20
+
+Added `compiled-objective` to the existing two-rank Gloo integration. The test
+runs real default-mode CPU Inductor, compares four updates with single-process
+eager using the same L2 limits as compiled-model, and checks that both ranks
+invoke compilation, finish with bit-identical replicas, and destroy their
+process groups. The two eager cases and the model-scope case still pass.
+
+```sh
+CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 TORCHINDUCTOR_COMPILE_THREADS=1 PYTHONDONTWRITEBYTECODE=1 ./test.sh -p no:cacheprovider --tb=short
+```
+
+Exit 0, **405 passed in 41.09s** with local loopback access. Objective-scope
+DDP CPU updates are verified. GPU execution and speed are unmeasured here.

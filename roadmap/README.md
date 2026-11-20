@@ -23,17 +23,30 @@ before launching the affected runs.
 
 ## Resume Here
 
-Current task (2026-11-20): [029 — Opt-in model compilation](029-model-compile.md)
+Current task (2026-11-20): [030 — Fused AdamW](030-fused-adamw.md)
+on `feat/acceleration`.
+
+- Agreed: `OptimizerConfig.fused_adamw=False`. Opt-in enables the existing
+  AdamW group's fused implementation. Default dispatch remains unchanged.
+- First Red: `2 failed, 52 passed`. The real fused CPU reference runs, then
+  the factory case stops at the missing keyword. The config snapshot also
+  lacks the new field.
+- Green: `54 passed` in the targeted CPU regression and `406 passed in
+  38.44s` in the full CPU suite. The default uses PyTorch automatic dispatch.
+  The fused and default paths also agree after three real tiny-Llama updates.
+  GPU throughput remains unmeasured.
+
+Previous task (2026-11-20): [029 — Opt-in model compilation](029-model-compile.md)
 on `feat/acceleration`.
 
 - Agreed: `RunConfig.compile_scope` alone selects `"none"` (default eager),
   `"model"` (compiled forward), or `"objective"` (compiled forward and loss).
   `compile_mode` selects the PyTorch mode. The old boolean is superseded.
-- Objective scope Green: `97 passed` in the targeted CPU regression. A real
-  single-process CPU Inductor smoke matches eager after one update and one
-  evaluation. Full CPU suite: `404 passed in 29.43s`, including model-scope
-  DDP with the approved update-error limits. Objective multi-rank and GPU
-  performance remain unverified.
+- Model and objective scopes Green on CPU. A real single-process objective
+  smoke matches eager after one update and one evaluation. Both compiled
+  scopes pass two-rank Gloo with identical replicas and the approved
+  update-error limits. Full CPU suite: `405 passed in 41.09s`. GPU execution
+  and performance remain unverified.
 - First Red: `2 failed, 92 passed in 4.51s`. Both enabled cases fail at the
   missing `RunConfig.compile_model` keyword. The eager case passes.
 - Green: the user added the config fields and in-place `model.compile()` before
