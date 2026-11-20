@@ -87,6 +87,7 @@ class ModelConfig:
     norm_eps: float
     embedding_std: float
     output_std_coeff: float
+    use_cache: bool = False
 
     def __post_init__(self):
         for name in ("vocab_size", "n_layers", "d_model", "d_ff", "n_heads", "n_kv_heads", "max_seq_len"):

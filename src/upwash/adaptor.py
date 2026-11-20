@@ -30,6 +30,7 @@ def config_adaptor(config: ModelConfig) -> LlamaConfig:
         attention_bias=False,
         mlp_bias=False,
         attention_dropout=0.0,
+        use_cache=config.use_cache
     )
 
 def output_multiplier(config: ModelConfig) -> float:

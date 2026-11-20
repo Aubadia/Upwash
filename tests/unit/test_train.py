@@ -57,6 +57,48 @@ def test_run_config_rejects_a_partial_training_sequence(tmp_path, make_optimizer
         make_run_config(tmp_path, make_optimizer_config, train_data=data)
 
 
+@pytest.mark.parametrize(
+    ("compile_options", "expected_mode"),
+    [
+        ({}, None),
+        ({"compile_model": True}, "default"),
+        ({"compile_model": True, "compile_mode": "reduce-overhead"}, "reduce-overhead"),
+    ],
+    ids=["eager-by-default", "default-mode", "explicit-mode"],
+)
+def test_train_uses_model_compilation_only_when_enabled(
+    tmp_path, make_optimizer_config, monkeypatch, compile_options, expected_mode,
+):
+    from upwash.core.state import TrainingState
+
+    entry = importlib.import_module("upwash.train")
+    config = make_run_config(tmp_path, make_optimizer_config, **compile_options)
+    model = torch.nn.Identity()
+    compiled_model = torch.nn.Sequential(model)
+    compile_calls = []
+    state = TrainingState()
+
+    def compile_model(module, *, mode=None, **kwargs):
+        compile_calls.append((module, mode))
+        return compiled_model
+
+    def build_trainer(*, model, **kwargs):
+        assert model is expected_training_model
+        return SimpleNamespace(train=lambda *args, **kwargs: state)
+
+    expected_training_model = model if expected_mode is None else compiled_model
+    monkeypatch.setattr(entry, "build_llama_model", lambda config: model)
+    monkeypatch.setattr(torch, "compile", compile_model)
+    monkeypatch.setattr(entry, "build_trainer", build_trainer)
+
+    with torch.random.fork_rng(devices=[]):
+        result = entry.train(config)
+
+    assert compile_calls == ([] if expected_mode is None else [(model, expected_mode)])
+    assert result.model is model
+    assert result.state is state
+
+
 def test_train_runs_the_entire_budget_including_the_final_partial_batch(
     tmp_path, make_optimizer_config, monkeypatch,
 ):

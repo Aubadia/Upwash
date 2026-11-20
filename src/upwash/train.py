@@ -29,8 +29,12 @@ def train(config: RunConfig) -> TrainResult:
 
         train_dataset = build_dataset(config.train_data)
         if runtime.world_size > 1:
-            train_dataset = RankShard(train_dataset, rank=runtime.rank, world_size=runtime.world_size,
-                    batch_size=config.batch_size)
+            train_dataset = RankShard(
+                train_dataset, 
+                rank=runtime.rank, 
+                world_size=runtime.world_size,
+                batch_size=config.batch_size
+            )
         train_loader = DataLoader(
             train_dataset,
             batch_size=config.batch_size,

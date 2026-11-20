@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-11-14 (Asia/Taipei).
+Last updated: 2026-11-20 (Asia/Taipei).
 
 Merge verification: merged `origin/main` at `5d989c7` into `feat/Adaptor`.
 Resolved the progress-log conflict by retaining both branches' records. Adapted
@@ -23,7 +23,32 @@ before launching the affected runs.
 
 ## Resume Here
 
-Current task (2026-11-20): [027 — Gradient clipping](027-gradient-clipping.md)
+Current task (2026-11-20): [029 — Opt-in model compilation](029-model-compile.md)
+on `feat/acceleration`.
+
+- Agreed: `RunConfig(compile_model=False, compile_mode="default")`. Enabled
+  runs pass the compiled model to Trainer and retain the original result model.
+- First Red: `2 failed, 92 passed in 4.51s`. Both enabled cases fail at the
+  missing `RunConfig.compile_model` keyword. The eager case passes.
+- Next: the user adds the config fields and compile wiring, then rerun the
+  entry-point regressions. Real compilation remains unverified.
+
+Previous task (2026-11-20): [028 — Disable the training KV cache](028-training-kv-cache.md)
+on `feat/acceleration`, based on `main` at `e2efe61`.
+
+- Red: a real tiny Llama training forward returns a `DynamicCache` by default.
+  The new test expects `past_key_values is None` and passes with the
+  `experiment` adapter at `180bd4f`.
+- Local CPU regression: `1 failed, 27 passed in 4.67s`. See task 028 for the
+  command and observed failure. No Slurm job was needed on this machine.
+- Green: `ModelConfig.use_cache` now defaults to `False`. The adapter forwards
+  it, and `to_dict()` records the selected value. Targeted CPU regression:
+  `85 passed in 5.36s`.
+- The full CPU run passed 394 cases and hit a sandbox socket restriction in
+  three distributed tests. Those three passed on a separate local rerun with
+  loopback socket access. Commands are in task 028.
+
+Previous task (2026-11-20): [027 — Gradient clipping](027-gradient-clipping.md)
 on `feat/grad_clip`, based on `main` at `73b1875`.
 
 - Agreed: optional `max_grad_norm`, global L2 clipping between backward and
