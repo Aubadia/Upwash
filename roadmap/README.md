@@ -23,6 +23,15 @@ before launching the affected runs.
 
 ## Resume Here
 
+The [task 031 PR #17 follow-up](031-flashattention-3.md#pr-17-wrapper-follow-up--2026-11-21)
+now starts with dense FA3 for the current fixed-length batches. The pinned
+reference and both dense Upwash dtype cases are Green with the FA3 stand-in
+(**45 passed** in the targeted run). The full CPU run passes 406 cases and
+blocks five at sandboxed localhost binds; all five pass on rerun with
+localhost access. Next: verify real CUDA FA3 forward, backward, and compiled
+graph breaks. The optional FA3 dependency is not yet locked or installed
+locally.
+
 The [task 029 DDP compile follow-up](029-model-compile.md#compile-the-ddp-wrapper--2026-11-21)
 now compiles the DDP wrapper in multi-rank runs for both `model` and
 `objective` scopes. Full CPU suite: **409 passed in 19.98s**, including

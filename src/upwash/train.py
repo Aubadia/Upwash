@@ -6,13 +6,14 @@ import torch.distributed as dist
 
 from upwash.adaptor import build_llama_model, causal_lm_loss
 from upwash.builder import build_dataset, build_trainer
+from upwash.components.kernels.fa3 import register_upwash_fa3_wrapper
 from upwash.components.optimizers.muon_adamw import build_muon_adamw
 from upwash.components.schedulers.wsd import build_wsd_scheduler
 from upwash.config import RunConfig
 from upwash.core.data import CUDAPrefetchLoader, DataLoader, RankShard
-from upwash.core.state import TrainingState
 from upwash.core.logger import FlockLogger
 from upwash.core.runtime import setup_runtime, teardown_runtime
+from upwash.core.state import TrainingState
 
 
 class _CausalLMObject(torch.nn.Module):
@@ -41,12 +42,12 @@ def train(config: RunConfig) -> TrainResult:
         train_dataset = build_dataset(config.train_data)
         if runtime.world_size > 1:
             train_dataset = RankShard(
-                train_dataset, 
-                rank=runtime.rank, 
+                train_dataset,
+                rank=runtime.rank,
                 world_size=runtime.world_size,
                 batch_size=config.batch_size
             )
-        
+
         train_loader = DataLoader(
             train_dataset,
             batch_size=config.batch_size,
@@ -65,7 +66,10 @@ def train(config: RunConfig) -> TrainResult:
         )
 
         model = build_llama_model(config.model).to(runtime.device)
-        
+
+        register_upwash_fa3_wrapper()
+
+        # use "upwash_fa3" to enable upwash fa3 wrapper
         if config.attention_implementation is not None:
             model.set_attn_implementation(config.attention_implementation)
 
