@@ -1,7 +1,9 @@
+from contextlib import nullcontext
 from dataclasses import dataclass
 from functools import partial
 
 import torch
+import torch._dynamo
 import torch.distributed as dist
 
 from upwash.adaptor import build_llama_model, causal_lm_loss
@@ -76,6 +78,14 @@ def train(config: RunConfig) -> TrainResult:
         trained = _CausalLMObject(model) if config.compile_scope == "objective" else model
         compile_enabled = config.compile_scope in ("model", "objective")
 
+        compile_setting = (
+            torch._dynamo.config.patch(
+                recompile_limit=64,
+                fail_on_recompile_limit_hit=True
+            )
+            if compile_enabled else nullcontext()
+        )
+
         if runtime.world_size > 1:
             trained = torch.nn.parallel.DistributedDataParallel(
                 trained,
@@ -103,7 +113,10 @@ def train(config: RunConfig) -> TrainResult:
             eval_perplexity=True,
             world_size=runtime.world_size,
         )
-        state = trainer.train(train_loader, eval_batches=eval_loader)
+
+        with compile_setting:
+            state = trainer.train(train_loader, eval_batches=eval_loader)
+
         if runtime.world_size > 1:
             dist.barrier()
         return TrainResult(model=model, state=state)

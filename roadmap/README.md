@@ -23,6 +23,12 @@ before launching the affected runs.
 
 ## Resume Here
 
+The [task 029 PR #17 recompile limit](029-model-compile.md#pr-17-dynamo-recompilation-limit--2026-11-21)
+is Green: **27 passed** in the two-file regression against the saved source.
+Both compiled scopes use `(64, True)` during `trainer.train()`, and exit
+with the caller's settings restored. Eager keeps the caller's settings
+throughout. H200 recompilation counts remain unmeasured.
+
 The [task 031 PR #17 follow-up](031-flashattention-3.md#pr-17-wrapper-follow-up--2026-11-21)
 now starts with dense FA3 for the current fixed-length batches. The pinned
 reference and both dense Upwash dtype cases are Green with the FA3 stand-in

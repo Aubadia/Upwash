@@ -340,6 +340,56 @@ update tolerances and bit-identical replicas. CUDA/NCCL is unverified for
 this ordering. Next, compare both orderings with a matched 8-GPU Slurm run,
 recording compilation time and steady-state throughput.
 
+## PR #17 Dynamo recompilation limit — 2026-11-21
+
+The [second review comment](https://github.com/Aubadia/Upwash/pull/17#discussion_r4651858560)
+reports that the default Dynamo recompilation limit causes eager fallback
+with compiled FA3 at larger model depths. For both compiled scopes, set
+`recompile_limit=64` and `fail_on_recompile_limit_hit=True` for the duration
+of `trainer.train(...)`, which also covers its scheduled evaluation.
+Preserve the caller's Dynamo settings for eager runs and after the call.
+
+```sh
+OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 ./test.sh -p no:cacheprovider --tb=short tests/unit/test_train.py tests/unit/test_train_ddp.py
+```
+
+First Red: exit 1, **2 failed, 25 passed in 2.93s**. The test reads real
+PyTorch 2.15.0 Dynamo settings inside a stand-in for `Trainer.train`.
+Model and objective compilation both retain the seeded `(8, False)`
+settings instead of `(64, True)`. Eager mode and the existing routing
+regressions pass. Next: the user wraps the training call in a Dynamo
+configuration context for compiled runs, then rerun the targeted command.
+The test does not measure the number of recompilations on H200.
+
+Initial implementation review: rerunning the same command exits 1 with
+**15 failed, 3 passed, 9 errors in 2.91s**. All failed cases and setup
+errors stop at import with `SyntaxError` on
+`from transformers..pytorch_utils import ...`; the Dynamo assertions have
+not run. Source inspection shows the patch currently wraps only creation of
+the compiled callable in the single-process and DDP branches.
+`trainer.train(...)` is still outside that context. Next: remove the invalid
+unused import and move the existing context to the training call, then
+rerun the same command. Production code and tests were left untouched
+during this verification.
+
+Follow-up: the configuration context now encloses `trainer.train(...)`
+and the compile calls are outside it. The regular two-file command still
+exits 1 with **15 failed, 3 passed, 9 errors in 2.02s** because the broken
+import is still on disk. A separate Python stdin diagnostic loaded
+`train.py` with only the first two unused imports omitted in memory and
+ran pytest on the same two files. It exits 0 with **27 passed, 1 warning in
+0.15s** (pytest could not rewrite an already imported anyio module).
+This verifies the updated context placement in isolation. Next: remove the
+two imports on disk and rerun the regular command. No production files
+were changed during the diagnostic.
+
+Green: the user removed both unused imports. Reran the regular two-file
+command against the saved source. Exit 0, **27 passed in 2.01s**. The
+`model` and `objective` scope tests observe `(64, True)` inside
+`trainer.train(...)` and the original settings after it returns. Eager
+keeps the original settings throughout. The DDP routing regressions also
+pass. H200 recompilation counts remain unmeasured.
+
 ## Deferred optimizer compilation — 2026-11-20
 
 The experiment at `8718eb1` uses Inductor for `optimizer.step()` when

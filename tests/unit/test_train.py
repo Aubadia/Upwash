@@ -254,6 +254,43 @@ def test_train_compiles_model_and_loss_together_in_objective_scope(
     assert not torch.equal(model.embed_tokens.weight, initial_weight)
 
 
+@pytest.mark.parametrize(
+    ("compile_scope", "expected_settings"),
+    [
+        ("none", (8, False)),
+        ("model", (64, True)),
+        ("objective", (64, True)),
+    ],
+)
+def test_train_scopes_dynamo_recompile_settings_to_compiled_training(
+    tmp_path, make_optimizer_config, monkeypatch, compile_scope, expected_settings,
+):
+    from torch._dynamo import config as dynamo_config
+
+    from upwash.core.state import TrainingState
+
+    entry = importlib.import_module("upwash.train")
+    config = make_run_config(tmp_path, make_optimizer_config, compile_scope=compile_scope)
+    state = TrainingState()
+
+    def run(train_loader, *, eval_batches):
+        settings = (dynamo_config.recompile_limit, dynamo_config.fail_on_recompile_limit_hit)
+        assert settings == expected_settings
+        return state
+
+    monkeypatch.setattr(entry, "build_llama_model", lambda config: torch.nn.Identity())
+    monkeypatch.setattr(torch.nn.Module, "compile", lambda self, **kwargs: None)
+    monkeypatch.setattr(entry, "build_trainer", lambda **kwargs: SimpleNamespace(train=run))
+
+    with torch.random.fork_rng(devices=[]), dynamo_config.patch(
+        recompile_limit=8, fail_on_recompile_limit_hit=False,
+    ):
+        result = entry.train(config)
+        assert (dynamo_config.recompile_limit, dynamo_config.fail_on_recompile_limit_hit) == (8, False)
+
+    assert result.state is state
+
+
 def test_train_runs_the_entire_budget_including_the_final_partial_batch(
     tmp_path, make_optimizer_config, monkeypatch,
 ):
