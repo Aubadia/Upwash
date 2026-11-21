@@ -176,7 +176,7 @@ def test_rank_one_of_two_trains_its_shard_through_ddp(tmp_path, make_optimizer_c
     ],
     ids=["default-attention", "flash-attention-3", "explicit-eager-attention"],
 )
-def test_train_selects_attention_after_placement_and_before_compile_and_ddp(
+def test_train_selects_attention_after_placement_and_compiles_after_ddp(
     tmp_path, make_optimizer_config, entry, monkeypatch, run_options, attention_calls,
 ):
     config = make_config(tmp_path, make_optimizer_config, compile_scope="model", **run_options)
@@ -193,8 +193,9 @@ def test_train_selects_attention_after_placement_and_before_compile_and_ddp(
     def select_attention(model, implementation):
         calls.append(("attention", implementation))
 
-    def compile_model(model, *, mode):
-        calls.append(("compile", mode))
+    def compile_model(module, *, mode, **kwargs):
+        calls.append(("compile", module, mode))
+        return module
 
     def wrap_ddp(wrapper, module, **kwargs):
         calls.append(("ddp", module))
@@ -202,12 +203,17 @@ def test_train_selects_attention_after_placement_and_before_compile_and_ddp(
 
     monkeypatch.setattr(TinyLM, "to", move_model)
     monkeypatch.setattr(TinyLM, "set_attn_implementation", select_attention, raising=False)
-    monkeypatch.setattr(TinyLM, "compile", compile_model)
+    monkeypatch.setattr(torch, "compile", compile_model)
     monkeypatch.setattr(FakeDDP, "__init__", wrap_ddp)
     with torch.random.fork_rng(devices=[]):
         result = entry.module.train(config)
 
-    assert calls == [("device", runtime.device), *attention_calls, ("compile", "default"), ("ddp", result.model)]
+    assert calls == [
+        ("device", runtime.device),
+        *attention_calls,
+        ("ddp", result.model),
+        ("compile", FakeDDP.instances[0], "default"),
+    ]
     assert result.state.global_step == 2
 
 

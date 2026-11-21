@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-11-20 (Asia/Taipei).
+Last updated: 2026-11-21 (Asia/Taipei).
 
 Merge verification: merged `origin/main` at `5d989c7` into `feat/Adaptor`.
 Resolved the progress-log conflict by retaining both branches' records. Adapted
@@ -22,6 +22,13 @@ grant counts, and the official final configuration remain clarification items
 before launching the affected runs.
 
 ## Resume Here
+
+The [task 029 DDP compile follow-up](029-model-compile.md#compile-the-ddp-wrapper--2026-11-21)
+now compiles the DDP wrapper in multi-rank runs for both `model` and
+`objective` scopes. Full CPU suite: **409 passed in 19.98s**, including
+both real two-rank Gloo compile cases. CUDA/NCCL throughput remains unmeasured.
+Next for compilation: compare both wrapper orderings in a matched 8-GPU
+Slurm run.
 
 Current task (2026-11-20): [032 — CUDA batch prefetch](032-cuda-batch-prefetch.md)
 on `feat/acceleration`.

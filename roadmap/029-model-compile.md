@@ -313,6 +313,33 @@ CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 TORCHINDUCTOR_COMPILE_THREADS=1 PYTHON
 Exit 0, **405 passed in 41.09s** with local loopback access. Objective-scope
 DDP CPU updates are verified. GPU execution and speed are unmeasured here.
 
+## Compile the DDP wrapper — 2026-11-21
+
+For multiple ranks, the training entry point builds the model or causal LM
+objective chosen by `compile_scope`, wraps it in DDP, then passes the wrapper
+to `torch.compile(..., mode=config.compile_mode)`. This follows the ordering
+in [the experiment's 150M training entry point](https://github.com/Aubadia/Upwash/blob/8718eb1/experiments/speed150m/train_fast.py#L69-L81).
+Single-process runs use the selected module's `.compile()` method.
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 ./test.sh -p no:cacheprovider --tb=short tests/unit/test_train_ddp.py -k compiles_after_ddp
+```
+
+Before the production change, this command exited 1 with **3 failed,
+6 deselected**. Each case observed compilation of the inner model before
+DDP wrapping. The cases now expect device placement, optional attention
+selection, DDP wrapping, then compilation of that wrapper.
+
+```sh
+CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 TORCHINDUCTOR_COMPILE_THREADS=1 PYTHONDONTWRITEBYTECODE=1 ./test.sh -p no:cacheprovider --tb=short
+```
+
+Exit 0, **409 passed in 19.98s** on the local Mac with loopback access.
+The real two-rank Gloo tests passed for both compile scopes with the existing
+update tolerances and bit-identical replicas. CUDA/NCCL is unverified for
+this ordering. Next, compare both orderings with a matched 8-GPU Slurm run,
+recording compilation time and steady-state throughput.
+
 ## Deferred optimizer compilation — 2026-11-20
 
 The experiment at `8718eb1` uses Inductor for `optimizer.step()` when

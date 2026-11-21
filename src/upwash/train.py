@@ -69,20 +69,19 @@ def train(config: RunConfig) -> TrainResult:
         if config.attention_implementation is not None:
             model.set_attn_implementation(config.attention_implementation)
 
-        trained = model
-        
-        if config.compile_scope == "model":
-            model.compile(mode=config.compile_mode)
-        elif config.compile_scope == "objective":
-            trained = _CausalLMObject(model)
-            trained.compile(mode=config.compile_mode)
-        
+        trained = _CausalLMObject(model) if config.compile_scope == "objective" else model
+        compile_enabled = config.compile_scope in ("model", "objective")
+
         if runtime.world_size > 1:
             trained = torch.nn.parallel.DistributedDataParallel(
                 trained,
                 device_ids=[torch.device(runtime.device).index] if runtime.device.startswith("cuda") else None,
                 forward_sync_buffers=False,
             )
+            if compile_enabled:
+                trained = torch.compile(trained, mode=config.compile_mode)
+        elif compile_enabled:
+            trained.compile(mode=config.compile_mode)
 
         if config.logging is not None and runtime.is_main:
             logger = FlockLogger(project=config.logging.project, name=config.logging.name)
