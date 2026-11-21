@@ -121,4 +121,5 @@ def test_model_config_rejects_non_positive_or_nonfinite_scalars(name, value):
 
 def test_model_config_to_dict_returns_every_setting():
     # Recorded in the run config: the spec requires model configuration and initialization.
-    assert make_model_config().to_dict() == MODEL_150M
+    assert make_model_config().to_dict() == {**MODEL_150M, "use_cache": False}
+    assert make_model_config(use_cache=True).to_dict() == {**MODEL_150M, "use_cache": True}

@@ -51,7 +51,7 @@ class FakeDDP(torch.nn.Module):
         return self.module(*args, **kwargs)
 
 
-def make_config(tmp_path, make_optimizer_config, *, logging=None):
+def make_config(tmp_path, make_optimizer_config, *, logging=None, **run_options):
     from upwash.config import DataConfig, ModelConfig, RunConfig, ScheduleConfig, TrainingConfig
 
     # Distinct token ids, so each sequence identifies which sample it is.
@@ -65,6 +65,7 @@ def make_config(tmp_path, make_optimizer_config, *, logging=None):
         training=TrainingConfig(optimizer=make_optimizer_config(), precision="fp32"),
         schedule=ScheduleConfig(warmup_ratio=0.0, decay_ratio=0.0, decay_shape="power", decay_power=1.0),
         batch_size=2, eval_batch_size=2, device="cpu", seed=17, logging=logging,
+        **run_options,
     )
 
 
@@ -164,6 +165,56 @@ def test_rank_one_of_two_trains_its_shard_through_ddp(tmp_path, make_optimizer_c
     assert result.model is entry.models[0]  # unwrapped: no "module." parameter prefix
     assert "barrier" in entry.calls
     assert entry.calls[-1] == ("teardown", runtime)
+
+
+@pytest.mark.parametrize(
+    ("run_options", "attention_calls"),
+    [
+        ({}, []),
+        ({"attention_implementation": "flash_attention_3"}, [("attention", "flash_attention_3")]),
+        ({"attention_implementation": "eager"}, [("attention", "eager")]),
+    ],
+    ids=["default-attention", "flash-attention-3", "explicit-eager-attention"],
+)
+def test_train_selects_attention_after_placement_and_compiles_after_ddp(
+    tmp_path, make_optimizer_config, entry, monkeypatch, run_options, attention_calls,
+):
+    config = make_config(tmp_path, make_optimizer_config, compile_scope="model", **run_options)
+    runtime = as_rank(entry, monkeypatch, rank=1)
+    calls = []
+    original_to = TinyLM.to
+    original_ddp_init = FakeDDP.__init__
+
+    def move_model(model, device):
+        result = original_to(model, device)
+        calls.append(("device", device))
+        return result
+
+    def select_attention(model, implementation):
+        calls.append(("attention", implementation))
+
+    def compile_model(module, *, mode, **kwargs):
+        calls.append(("compile", module, mode))
+        return module
+
+    def wrap_ddp(wrapper, module, **kwargs):
+        calls.append(("ddp", module))
+        original_ddp_init(wrapper, module, **kwargs)
+
+    monkeypatch.setattr(TinyLM, "to", move_model)
+    monkeypatch.setattr(TinyLM, "set_attn_implementation", select_attention, raising=False)
+    monkeypatch.setattr(torch, "compile", compile_model)
+    monkeypatch.setattr(FakeDDP, "__init__", wrap_ddp)
+    with torch.random.fork_rng(devices=[]):
+        result = entry.module.train(config)
+
+    assert calls == [
+        ("device", runtime.device),
+        *attention_calls,
+        ("ddp", result.model),
+        ("compile", FakeDDP.instances[0], "default"),
+    ]
+    assert result.state.global_step == 2
 
 
 @pytest.mark.parametrize(("rank", "expected_runs"), [(0, 1), (1, 0)])

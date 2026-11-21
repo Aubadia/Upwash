@@ -9,6 +9,7 @@ class OptimizerConfig:
     adam_beta2: float
     adam_lr_multiplier: float
     weight_decay: float
+    fused_adamw: bool = False
 
     def __post_init__(self):
         if not (math.isfinite(self.lr) and self.lr >= 0):
@@ -87,6 +88,7 @@ class ModelConfig:
     norm_eps: float
     embedding_std: float
     output_std_coeff: float
+    use_cache: bool = False
 
     def __post_init__(self):
         for name in ("vocab_size", "n_layers", "d_model", "d_ff", "n_heads", "n_kv_heads", "max_seq_len"):
@@ -157,6 +159,10 @@ class RunConfig:
     device: str = "cpu"
     seed: int = 0
     logging: LoggingConfig | None = None
+    compile_mode: str = "default"
+    compile_scope: str = "none"    # none, model, objective
+    attention_implementation: str | None = None
+    prefetch_to_device: bool = False
 
     def __post_init__(self):
         for name in ("batch_size", "eval_batch_size"):

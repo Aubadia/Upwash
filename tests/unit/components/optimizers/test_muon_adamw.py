@@ -85,10 +85,51 @@ def test_factory_partitions_tied_llama_parameters_and_applies_model_width(make_o
             else:
                 assert name in adam_names
                 expected = reference_adam.param_groups[0]
-                keys = ("lr", "betas", "weight_decay")
+                keys = ("lr", "betas", "weight_decay", "fused", "foreach")
             for key in keys:
                 assert group[key] == expected[key], (name, key)
 
     assert Counter(assigned_names) == Counter(muon_names | adam_names)
     for name, parameter in model.named_parameters():
         torch.testing.assert_close(parameter, initial_parameters[name], rtol=0, atol=0)
+
+
+def test_factory_fused_adamw_matches_reference_updates_and_state(make_optimizer_config):
+    model_config = ModelConfig(
+        vocab_size=8, n_layers=1, d_model=4, d_ff=8, n_heads=2, n_kv_heads=1,
+        max_seq_len=4, rope_theta=500_000.0, norm_eps=1e-5,
+        embedding_std=0.1, output_std_coeff=1.0,
+    )
+    with torch.random.fork_rng(devices=[]):
+        torch.manual_seed(0)
+        model = torch.nn.Linear(4, 3)
+
+    initial = model.bias.detach().clone()
+    reference_bias = torch.nn.Parameter(initial.clone())
+    gradients = [torch.tensor([0.2, -0.3, 0.4]), torch.tensor([0.05, 0.1, -0.2])]
+    defaults = make_optimizer_config()
+    reference = torch.optim.AdamW(
+        [reference_bias],
+        lr=defaults.lr * defaults.adam_lr_multiplier,
+        betas=(defaults.adam_beta1, defaults.adam_beta2),
+        weight_decay=defaults.weight_decay / model_config.d_model,
+        fused=True,
+    )
+    for gradient in gradients:
+        reference_bias.grad = gradient.clone()
+        reference.step()
+    assert not torch.equal(reference_bias, initial)
+
+    from upwash.components.optimizers.muon_adamw import build_muon_adamw
+
+    optimizer = build_muon_adamw(
+        model, config=make_optimizer_config(fused_adamw=True), model_config=model_config,
+    )
+    adamw = next(part for part in optimizer.optimizers if isinstance(part, torch.optim.AdamW))
+    assert adamw.param_groups[0]["fused"] is True
+    for gradient in gradients:
+        model.bias.grad = gradient.clone()
+        optimizer.step()
+
+    torch.testing.assert_close(model.bias, reference_bias, rtol=1e-6, atol=1e-7)
+    torch.testing.assert_close(adamw.state[model.bias], reference.state[reference_bias], rtol=1e-6, atol=1e-7)

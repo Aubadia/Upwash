@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor
+
 import torch
 from huggingface_hub import snapshot_download
 from pathlib import Path
@@ -49,6 +51,45 @@ class DataLoader:
             return len(self.dataset) // self.batch_size
         else:
             return (len(self.dataset) + self.batch_size -1) // self.batch_size
+
+
+class CUDAPrefetchLoader:
+    def __init__(self, loader, device):
+        self.loader = loader
+        self.device = torch.device(device)
+
+    def __len__(self):
+        return len(self.loader)
+
+    def __iter__(self):
+        batches = iter(self.loader)
+        copy_stream = torch.cuda.Stream(device=self.device)
+
+        def copy_next_batch():
+            batch = next(batches, None)
+            if batch is None:
+                return None
+
+            with torch.cuda.stream(copy_stream):
+                tensors = tuple(
+                    tensor.pin_memory().to(self.device, non_blocking=True) for tensor in batch
+                )
+                ready = copy_stream.record_event()
+            return tensors, ready
+
+        with ThreadPoolExecutor(max_workers=1) as worker:
+            pending = worker.submit(copy_next_batch)
+            while (prefetched := pending.result()) is not None:
+                batch, ready = prefetched
+                pending = worker.submit(copy_next_batch)
+
+                # Wait for this batch without waiting for the next copy on the same stream.
+                consumer_stream = torch.cuda.current_stream(self.device)
+                consumer_stream.wait_event(ready)
+                for tensor in batch:
+                    tensor.record_stream(consumer_stream)
+                yield batch
+
 
 class ConcatDataset:
     def __init__(self, datasets):
