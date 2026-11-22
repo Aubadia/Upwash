@@ -92,6 +92,8 @@ class Trainer:
         self.max_grad_norm = max_grad_norm
 
     def compute_loss(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        if self.loss_fn is None:
+            return self.model(inputs, targets)
         predictions = self.model(inputs)
         return self.loss_fn(predictions, targets)
 

@@ -59,6 +59,15 @@ def random_tokens(config, shape=(4, 16), seed=1):
     return torch.randint(0, config.vocab_size, shape, generator=generator)
 
 
+def test_llama_training_forward_does_not_return_a_kv_cache_by_default():
+    config = small_config()
+    model = build(config).train()
+
+    outputs = model(random_tokens(config, shape=(1, 4)))
+
+    assert outputs.past_key_values is None
+
+
 @pytest.mark.parametrize(
     ("overrides", "expected"),
     [

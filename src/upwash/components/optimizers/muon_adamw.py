@@ -44,6 +44,7 @@ def build_muon_adamw(
                 lr=config.lr * config.adam_lr_multiplier,
                 betas=(config.adam_beta1, config.adam_beta2),
                 weight_decay=weight_decay,  # TODO: Consider adapt seperate weight decay
+                fused=True if config.fused_adamw else None
             )
         )
         
