@@ -1,4 +1,4 @@
-"""Tokenized documents to fixed-length training windows (task 028, step 2).
+"""Tokenized documents to fixed-length training windows (task 033, step 2).
 
 Agreed 2026-11-21:
 - A document is encoded as [BOS] + tokenize(text) + [EOS]. `tokenize` is a

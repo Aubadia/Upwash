@@ -1,4 +1,4 @@
-"""Packed token windows stored as a Lance dataset (task 028, step 3).
+"""Packed token windows stored as a Lance dataset (task 033, step 3).
 
 One row is one training window: a `tokens` column of type
 fixed_size_list<uint32, seq_len + 1> (option A, agreed 2026-11-21). The same module

@@ -24,6 +24,14 @@ dependencies = [
 [project.scripts]
 upwash = "upwash:main"
 
+[project.optional-dependencies]
+fa3 = [
+    "flash-attn-3 ; sys_platform == 'linux'",
+]
+
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.uv.sources]
+flash-attn-3 = { git = "https://github.com/Dao-AILab/flash-attention.git", subdirectory = "hopper" }

@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-11-14 (Asia/Taipei).
+Last updated: 2026-11-21 (Asia/Taipei).
 
 Merge verification: merged `origin/main` at `5d989c7` into `feat/Adaptor`.
 Resolved the progress-log conflict by retaining both branches' records. Adapted
@@ -23,7 +23,7 @@ before launching the affected runs.
 
 ## Resume Here
 
-Current task (2026-11-20): [028 — Data pipeline](028-data-pipeline.md), on branch `feat/data-pipeline` from `main` at `e2efe61`.
+Current task (2026-11-22): [033 — Data pipeline](033-data-pipeline.md), on branch `feat/data-pipeline`. Started from `main` at `e2efe61` and merged `main` at `6142f34` (PR #17) on 2026-11-22. It was renumbered from 028 because PR #17 took 028–032.
 
 - Design: each source goes through Paloma decontamination, tokenization and packing into a token Lance dataset in Flock S3 once. Training mixes the token datasets by weight. Measured on a nano4 compute node: sequential Flock reads of 757–881 MB/s, random document reads of only 160–290 docs/s, tokenization of 5.5–7.3M tok/s per node.
 - Decontamination follows Paloma C.1:
@@ -39,6 +39,124 @@ Current task (2026-11-20): [028 — Data pipeline](028-data-pipeline.md), on bra
   - Red: `tests/unit/core/test_lance_windows.py` fails at collection on the missing `upwash.core.lance_windows`.
 - Next: the user implements `core/lance_windows.py`.
 
+PR #17 H200 verification (2026-11-21/22, by the agent with scratch scripts outside git; 150M, 8×H200, 200 steps):
+- Slurm 821823: FA3 runs (`flash_attention_3`). All options give 1.37× over eager (1,696,890 → 2,325,874 tok/s), peak memory falls from 28.4 to 14.3 GB, eval loss matches, and replicas are bit-identical. DDP-then-compile and compile-then-DDP run within 1%.
+- Slurm 822693 / 822786: before the wrapper, HF's FA3 path broke the graph at `modeling_flash_attention_utils.py:594` (`logger.warning_once`) and hit the recompile limit of 8.
+- Slurm 830231 at `5e875f1`:
+  - `upwash_fa3` matches HF `flash_attention_3`: bitwise-identical logits and loss, and a worst gradient relative difference of 1.7e-3 (FA3 backward is non-deterministic).
+  - It runs 2,435,090 → 2,713,205 tok/s (1.11×), with recompiles 56 → 4 and graph breaks 57 → 5.
+  - The raised limit holds: 56 recompiles without a limit hit.
+- Slurm 830232: CPU suite `414 passed`.
+
+The [task 029 PR #17 recompile limit](029-model-compile.md#pr-17-dynamo-recompilation-limit--2026-11-21)
+is Green: **27 passed** in the two-file regression against the saved source.
+Both compiled scopes use `(64, True)` during `trainer.train()`, and exit
+with the caller's settings restored. Eager keeps the caller's settings
+throughout. H200 recompilation counts remain unmeasured.
+
+The [task 031 PR #17 follow-up](031-flashattention-3.md#pr-17-wrapper-follow-up--2026-11-21)
+now starts with dense FA3 for the current fixed-length batches. The pinned
+reference and both dense Upwash dtype cases are Green with the FA3 stand-in
+(**45 passed** in the targeted run). The full CPU run passes 406 cases and
+blocks five at sandboxed localhost binds; all five pass on rerun with
+localhost access. Next: verify real CUDA FA3 forward, backward, and compiled
+graph breaks. The optional FA3 dependency is not yet locked or installed
+locally.
+
+The [task 029 DDP compile follow-up](029-model-compile.md#compile-the-ddp-wrapper--2026-11-21)
+now compiles the DDP wrapper in multi-rank runs for both `model` and
+`objective` scopes. Full CPU suite: **409 passed in 19.98s**, including
+both real two-rank Gloo compile cases. CUDA/NCCL throughput remains unmeasured.
+Next for compilation: compare both wrapper orderings in a matched 8-GPU
+Slurm run.
+
+Previous task (2026-11-20): [032 — CUDA batch prefetch](032-cuda-batch-prefetch.md)
+on `feat/acceleration`.
+
+- Green: `RunConfig.prefetch_to_device=True` enables one-batch lookahead for
+  the CUDA training loader. The default, CPU, and evaluation paths use the
+  ordinary loader.
+- RTX 3080 Laptop verification: `2 passed`. A separate probe confirmed pinned
+  asynchronous transfers on a dedicated copy stream and repeatable traversal.
+  Full CPU suite: `409 passed in 41.62s`.
+- Next: measure copy/compute overlap and throughput against the default loader.
+
+[Optimizer compilation](029-model-compile.md#deferred-optimizer-compilation--2026-11-20)
+is deferred after the Inductor Muon numerical diagnostic.
+
+Previous task (2026-11-20): [031 — FlashAttention-3 selection](031-flashattention-3.md)
+on `feat/acceleration`.
+
+- Agreed: `RunConfig.attention_implementation=None`; apply explicit backends
+  after device placement and before compilation and DDP wrapping.
+- First Red: `1 failed, 41 passed`. The FA3 case stops at the missing config
+  keyword. Default selection and existing regressions pass.
+- Backend selection Green: `43 passed`. On the RTX 3080, real BF16 Llama
+  updates use SDPA by default and eager when requested.
+- Next: real FA3 acceptance requires the extension. The local CUDA 12.8
+  toolkit and PyTorch CUDA 13.2 build still prevent a source build.
+
+Previous task (2026-11-20): [030 — Fused AdamW](030-fused-adamw.md)
+on `feat/acceleration`.
+
+- Agreed: `OptimizerConfig.fused_adamw=False`. Opt-in enables the existing
+  AdamW group's fused implementation. Default dispatch remains unchanged.
+- First Red: `2 failed, 52 passed`. The real fused CPU reference runs, then
+  the factory case stops at the missing keyword. The config snapshot also
+  lacks the new field.
+- Green: `54 passed` in the targeted CPU regression and `406 passed in
+  38.44s` in the full CPU suite. The default uses PyTorch automatic dispatch.
+  The fused and default paths also agree after three real tiny-Llama updates.
+  GPU throughput remains unmeasured.
+
+Previous task (2026-11-20): [029 — Opt-in model compilation](029-model-compile.md)
+on `feat/acceleration`.
+
+- Agreed: `RunConfig.compile_scope` alone selects `"none"` (default eager),
+  `"model"` (compiled forward), or `"objective"` (compiled forward and loss).
+  `compile_mode` selects the PyTorch mode. The old boolean is superseded.
+- Model and objective scopes Green on CPU. A real single-process objective
+  smoke matches eager after one update and one evaluation. Both compiled
+  scopes pass two-rank Gloo with identical replicas and the approved
+  update-error limits. Full CPU suite: `405 passed in 41.09s`. GPU execution
+  and performance remain unverified.
+- First Red: `2 failed, 92 passed in 4.51s`. Both enabled cases fail at the
+  missing `RunConfig.compile_model` keyword. The eager case passes.
+- Green: the user added the config fields and in-place `model.compile()` before
+  DDP. The test now verifies which forward Trainer invokes, and the targeted
+  CPU regressions report `94 passed in 4.64s`.
+- A real single-process CPU Inductor smoke also passes. One tiny Llama update
+  produces parameters within `rtol=1e-4, atol=1e-5` of eager.
+- Two compiled CPU ranks complete four updates with identical replicas. The
+  compiled and eager parameters exceed the existing `5e-4` absolute threshold
+  at `gate_proj.weight`. The same difference reproduces with a single process.
+  See task 029 for the comparisons. GPU execution remains unverified.
+- Agreed for the compiled CPU case: relative L2 update error at most `1%`
+  globally and `2%` per tensor. Compiled DDP measured `0.192353%` globally and
+  `1.023451%` in the worst tensor at token seed 0, with smaller errors at
+  seed 1. Eager DDP retains its original absolute tolerance.
+- A four-update CPU diagnostic changed only Muon's orthogonalization cast in
+  a temporary process. FP32 reduced the maximum eager/compiled parameter gap
+  from `6.40780e-4` to `1.01328e-6`. The stock Muon training path retains BF16
+  orthogonalization.
+- The initial objective test was Red at the missing `compile_scope` keyword
+  (`1 failed, 94 passed`). The single-switch contract above replaces the
+  original two-field proposal.
+
+Previous task (2026-11-20): [028 — Disable the training KV cache](028-training-kv-cache.md)
+on `feat/acceleration`, based on `main` at `e2efe61`.
+
+- Red: a real tiny Llama training forward returns a `DynamicCache` by default.
+  The new test expects `past_key_values is None` and passes with the
+  `experiment` adapter at `180bd4f`.
+- Local CPU regression: `1 failed, 27 passed in 4.67s`. See task 028 for the
+  command and observed failure. No Slurm job was needed on this machine.
+- Green: `ModelConfig.use_cache` now defaults to `False`. The adapter forwards
+  it, and `to_dict()` records the selected value. Targeted CPU regression:
+  `85 passed in 5.36s`.
+- The full CPU run passed 394 cases and hit a sandbox socket restriction in
+  three distributed tests. Those three passed on a separate local rerun with
+  loopback socket access. Commands are in task 028.
 
 Previous task (2026-11-20): [027 — Gradient clipping](027-gradient-clipping.md)
 on `feat/grad_clip`, based on `main` at `73b1875`.

@@ -1,4 +1,4 @@
-"""Paloma decontamination, following Paloma (arXiv 2312.10523) Appendix C.1 (task 028, step 1).
+"""Paloma decontamination, following Paloma (arXiv 2312.10523) Appendix C.1 (task 033, step 1).
 
 - Text is matched at the paragraph level: newline-separated spans.
 - Evaluation paragraphs shorter than 13 Unicode-segmented tokens are ignored, and so are
