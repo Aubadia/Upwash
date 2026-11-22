@@ -89,3 +89,27 @@ def test_build_dataset_output_feeds_the_data_loader(flock_root):
     batches = list(DataLoader(dataset, batch_size=2))
 
     assert [tuple(x.shape) for x, _ in batches] == [(2, 4), (1, 4)]
+
+
+def test_a_shuffled_budget_reads_a_prefix_of_the_same_permutation(tmp_path):
+    # 40 samples of 4 tokens; each sample's first token identifies it.
+    np.save(tmp_path / "tokens.npy", np.arange(161, dtype=np.int32))
+
+    def first_tokens(num_samples, seed=42):
+        data = build_dataset(DataConfig(str(tmp_path), "tokens.npy", "npy", 4, 4 * num_samples, shuffle_seed=seed))
+        return [int(data[i][0][0]) for i in range(len(data))]
+
+    short, long = first_tokens(10), first_tokens(30)
+
+    assert long[:10] == short
+    assert len(set(long)) == 30
+    assert long != sorted(long)
+    assert first_tokens(30, seed=7) != long
+
+
+def test_no_shuffle_seed_keeps_storage_order(tmp_path):
+    np.save(tmp_path / "tokens.npy", np.arange(41, dtype=np.int32))
+
+    data = build_dataset(DataConfig(str(tmp_path), "tokens.npy", "npy", 4, 40))
+
+    assert [int(data[i][0][0]) for i in range(10)] == [4 * i for i in range(10)]

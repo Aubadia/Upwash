@@ -23,6 +23,41 @@ before launching the affected runs.
 
 ## Resume Here
 
+Current task (2026-11-22): [033 — Data pipeline](033-data-pipeline.md), on branch `feat/data-pipeline`. Started from `main` at `e2efe61` and merged `main` at `6142f34` (PR #17) on 2026-11-22. It was renumbered from 028 because PR #17 took 028–032.
+
+- Design: each source goes through Paloma decontamination, tokenization and packing into a token Lance dataset in Flock S3 once. Training mixes the token datasets by weight. Measured on a nano4 compute node: sequential Flock reads of 757–881 MB/s, random document reads of only 160–290 docs/s, tokenization of 5.5–7.3M tok/s per node.
+- Decontamination follows Paloma C.1:
+  - Exact paragraph matching. Evaluation paragraphs need 13 or more UAX #29 tokens; symbol-only paragraphs are ignored.
+  - Whole documents are removed. Code sources are not decontaminated.
+  - Agreed: `regex` WORD mode for segmentation, a hash set instead of a Bloom filter, both Paloma splits, and the `src/upwash/prep/` module.
+- Red (step 1): `tests/unit/prep/test_decontam.py` fails at collection on the missing `upwash.prep`.
+- Green (step 1, 2026-11-21): the user implemented `prep/decontam.py`. Full suite via `sbatch scripts/test.sbatch` (Slurm 820744) gives `414 passed`.
+- Red (step 2): `encode_document` and `pack_windows` (option A: one `seq_len + 1` window per row, `[BOS, text, EOS]`). `tests/unit/prep/test_pack.py` fails at collection on the missing module.
+- Green (step 2, 2026-11-21): `prep/pack.py` implemented by the user; full suite (Slurm 820764) gives `428 passed`.
+- Step 3:
+  - Flock path `lab7/dxnn1u-asciibase64/`. On S3, write works and random reads of 32 rows run at 445 windows/s with 8 threads; a 1B run needs about 100.
+  - Red: `tests/unit/core/test_lance_windows.py` fails at collection on the missing `upwash.core.lance_windows`.
+- Green (step 3, 2026-11-22): `core/lance_windows.py` implemented by the user. Full suite (Slurm 839332) gives `458 passed`.
+- Decided (2026-11-22):
+  - DCLM is the baseline. Code sources skip decontamination (Paloma C.1; ask the TA about overlap with Paloma code).
+  - Step 4 uses option B: fragments per job plus one commit.
+  - Step 5 is hand-written, and step 4 may be vibe-coded if the host agrees.
+- Red (step 5): `Permute`, `LanceWindowDataset` and `DataConfig(format="lance", version, shuffle_seed)`. 47 new or updated cases pass on a scratch reference.
+- Green (step 5, 2026-11-22): the user implemented the step 5 code. The step 5 files give `47 passed`, and the full suite (Slurm 839703) gives 477 passed.
+- Next:
+  - A PR for the hand-written steps 1–3 and 5.
+  - Step 4 on its own branch, once the host answers about vibe-coding.
+  - Then an 8-GPU smoke reading Lance from Flock.
+
+PR #17 H200 verification (2026-11-21/22, by the agent with scratch scripts outside git; 150M, 8×H200, 200 steps):
+- Slurm 821823: FA3 runs (`flash_attention_3`). All options give 1.37× over eager (1,696,890 → 2,325,874 tok/s), peak memory falls from 28.4 to 14.3 GB, eval loss matches, and replicas are bit-identical. DDP-then-compile and compile-then-DDP run within 1%.
+- Slurm 822693 / 822786: before the wrapper, HF's FA3 path broke the graph at `modeling_flash_attention_utils.py:594` (`logger.warning_once`) and hit the recompile limit of 8.
+- Slurm 830231 at `5e875f1`:
+  - `upwash_fa3` matches HF `flash_attention_3`: bitwise-identical logits and loss, and a worst gradient relative difference of 1.7e-3 (FA3 backward is non-deterministic).
+  - It runs 2,435,090 → 2,713,205 tok/s (1.11×), with recompiles 56 → 4 and graph breaks 57 → 5.
+  - The raised limit holds: 56 recompiles without a limit hit.
+- Slurm 830232: CPU suite `414 passed`.
+
 The [task 029 PR #17 recompile limit](029-model-compile.md#pr-17-dynamo-recompilation-limit--2026-11-21)
 is Green: **27 passed** in the two-file regression against the saved source.
 Both compiled scopes use `(64, True)` during `trainer.train()`, and exit
@@ -45,7 +80,7 @@ both real two-rank Gloo compile cases. CUDA/NCCL throughput remains unmeasured.
 Next for compilation: compare both wrapper orderings in a matched 8-GPU
 Slurm run.
 
-Current task (2026-11-20): [032 — CUDA batch prefetch](032-cuda-batch-prefetch.md)
+Previous task (2026-11-20): [032 — CUDA batch prefetch](032-cuda-batch-prefetch.md)
 on `feat/acceleration`.
 
 - Green: `RunConfig.prefetch_to_device=True` enables one-batch lookahead for

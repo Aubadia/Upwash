@@ -62,14 +62,18 @@ class DataConfig:
     format: str
     seq_len: int
     num_tokens: int
+    shuffle_seed: int | None = None
+    version: int | None = None
 
     def __post_init__(self):
-        if not (self.format == "npy" or self.format == "bin"):
-            raise ValueError(f"format must be 'npy' or 'bin', got {self.format!r}")
+        if self.format not in ("npy", "bin", "lance"):
+            raise ValueError(f"format must be 'npy', 'bin' or 'lance', got {self.format}")
         if not (self.seq_len > 0):
             raise ValueError(f"seq_len must be greater than 0, got {self.seq_len}")
         if not (self.num_tokens >= self.seq_len):
             raise ValueError(f"num_tokens must be at least seq_len ({self.seq_len}), got {self.num_tokens}")
+        if self.version is not None and self.format != "lance":
+            raise ValueError(f"version is only supported for format 'lance', got {self.format}")
 
     def to_dict(self):
         return asdict(self)
