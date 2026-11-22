@@ -102,10 +102,10 @@ Not specified by the paper, decided 2026-11-20:
 |---|---|---|---|
 | 1 | Decontamination: paragraphs, Unicode token count, eligibility, `ContaminationIndex` | `prep/decontam.py` | Green (2026-11-21) |
 | 2 | Encode documents and pack them into `seq_len + 1` windows | `prep/pack.py` | Green (2026-11-21) |
-| 3 | Lance token windows: `write_windows`, `LanceWindows` (schema check, `len`, `read(indices)`) | `core/lance_windows.py` | Red |
-| 4 | `LanceTokenDataset` and batched fetching in the training `DataLoader` | `core/data.py` | to design |
-| 5 | `MixtureDataset`: per-source weights, seed 42, exact per-source counts | `core/data.py` | to design |
-| 6 | Config: Lance sources and weights in `DataConfig` (with the run-config task) | `config.py` | to design |
+| 3 | Lance token windows: `write_windows`, `LanceWindows` (schema check, `len`, `read(indices)`) | `core/lance_windows.py` | Green (2026-11-22) |
+| 4 | Per-fragment processing job (decontaminate, encode, pack, write fragments) and one commit job; option B | `experiments/` or `scripts/` (vibe-coded on agreement) plus a fragment writer in `core/lance_windows.py` | to design |
+| 5 | Training reads Lance: `LanceWindowDataset`, `Permute`, `DataConfig(format="lance", version, shuffle_seed)` | `core/`, `config.py`, `builder.py` | Green (2026-11-22) |
+| 6 | `MixtureDataset` and config for several sources (deferred until a second source) | `core/data.py`, `config.py` | deferred |
 
 Prerequisites before step 3:
 - A write test to our `lab7/<pair>/` path in `flock-datasets`, then delete it.
@@ -181,6 +181,51 @@ table.read(indices) -> np.ndarray  # uint32, shape (len(indices), seq_len + 1)
 - Deferred to the parallel-job step: writing per-job fragments and committing them once.
 - Dependency: the user added `pylance>=14.0.3` (Lance 14.0.3 in `.venv`).
 
+## Decisions — 2026-11-22
+
+- Baseline source: DCLM on Flock (`dclm` v1: 2,949,254,346 docs; about 1,208 tokens/doc and
+  3.5T tokens in total). Paloma decontamination applies, since it is web text, not code.
+- Code sources (e.g. starcoder) are not decontaminated, per Paloma C.1. Open risk: Paloma's
+  `dolma_100_programing_languages` documents may overlap The Stack, so that source's BPB
+  could read optimistic. Ask the TA.
+- Step 4 output layout, option B: each job writes fragments only, and one commit job
+  creates a single dataset version. This avoids opening thousands of per-job datasets at
+  training start (about 0.7 s each on S3). The Lance APIs (`lance.fragment.write_fragments`,
+  `LanceDataset.commit`) still need a scratch check on Lance 14.0.3.
+- Step 4 may be vibe-coded as experiment tooling if the host agrees. It only calls the
+  hand-written steps 1–3, outside `src/`, with tests for token accounting, applied
+  decontamination and seeded fragment selection. Step 5 is hand-written (training path).
+- Step 5 reuses `DataLoader`, `RankShard`, `Truncate`, `ConcatDataset` and PR #17's
+  `CUDAPrefetchLoader`, whose worker thread already reads the next batch in the background.
+  S3 credentials come from `flock s3 configure` plus `AWS_PROFILE`, so there is no `flock`
+  dependency in Upwash. Batched reads (one `take` per batch) are deferred until an 8-GPU
+  measurement. The estimate: per-sample reads (about 21 ms each) fit a 1B step (about
+  330 ms) but not a 150M step (about 48 ms).
+
+## Agreed Interface — Step 5 (2026-11-22)
+
+```python
+from upwash.core.data import Permute
+from upwash.core.lance_windows import LanceWindowDataset
+
+Permute(dataset, seed)                 # one fixed permutation of the whole pool, the same on every rank
+LanceWindowDataset(uri, *, version=None)
+len(dataset); dataset.seq_len
+dataset[i] -> (inputs, targets)        # int64 tensors: row[:-1], row[1:]; negative indices allowed
+
+DataConfig(root, pattern, format, seq_len, num_tokens, shuffle_seed=None, version=None)
+# format "lance": root is the dataset URI; pattern is unused (""). version only for "lance".
+# build_dataset: pool -> Permute(shuffle_seed) if set -> Truncate(num_tokens // seq_len)
+```
+
+- Shuffle before truncation, so a shorter budget reads a prefix of the same permutation,
+  as on `experiment`. With `shuffle_seed=None`, storage order is unchanged, so existing
+  configs keep their behavior.
+- `build_dataset` rejects a Lance dataset whose `seq_len` differs from the config.
+- A `version` with `npy`/`bin` raises `ValueError`, because local files have no versions.
+- `to_dict()` now includes `shuffle_seed` and `version`. Its existing test was updated
+  for the changed interface.
+
 ## Tests
 
 `tests/unit/prep/test_decontam.py` (CPU, pure Python):
@@ -234,6 +279,32 @@ table.read(indices) -> np.ndarray  # uint32, shape (len(indices), seq_len + 1)
 - The tests were checked against a scratch reference implementation outside the repo:
   `12 passed`.
 
+Step 5 tests (CPU, local Lance directories):
+
+- `tests/unit/core/test_permute.py`:
+  - A seeded permutation of every sample.
+  - The same seed gives the same order, and another seed gives a different one.
+  - The length is kept, and an index past the end raises `IndexError`.
+- `tests/unit/core/test_lance_window_dataset.py`:
+  - A sample is the window shifted by one token, as `int64`, with negative and
+    out-of-range indices handled.
+  - `DataLoader` batches `(2,S),(2,S),(1,S)`.
+  - `build_dataset(format="lance")`:
+    - applies the token budget and rejects a budget larger than the data;
+    - rejects a `seq_len` mismatch;
+    - pins `version=1` after an append;
+    - gives a shuffled prefix property and is deterministic.
+  - Two `RankShard`s partition it.
+- `tests/unit/test_data_config.py`:
+  - `"lance"` is accepted, and both new fields default to `None`.
+  - A Lance config may pin a version and a seed. A version on `npy`/`bin` is rejected.
+  - `to_dict` includes the new fields.
+- `tests/unit/test_build_dataset.py`:
+  - A shuffled `npy` budget is a prefix of the same permutation; another seed differs.
+  - No seed keeps storage order.
+- The tests were checked against a scratch reference copy of `src/` outside the repo:
+  `47 passed in 8.61s`.
+
 ## Progress
 
 - 2026-11-20:
@@ -272,7 +343,45 @@ table.read(indices) -> np.ndarray  # uint32, shape (len(indices), seq_len + 1)
   - The user added `pylance`.
   - Red: `./test.sh tests/unit/core/test_lance_windows.py` fails at collection with
     `ModuleNotFoundError: No module named 'upwash.core.lance_windows'`, the intended Red.
-- Next: the user implements `core/lance_windows.py`.
+- 2026-11-22: merged `main` at `6142f34` (PR #17) and renumbered this task 028 → 033.
+- 2026-11-22, step 3, Green:
+  - The user implemented `core/lance_windows.py`.
+  - Review fixes:
+    - The first batch is now validated before Lance starts writing, because Lance wraps
+      generator exceptions as `OSError`.
+    - The row count comes from the returned dataset.
+    - Fixed: an off-by-one bounds check, a column-name typo, and a loop that never
+      fetched the next batch.
+  - `./test.sh tests/unit/core/test_lance_windows.py` gives `12 passed`.
+  - Full suite via `sbatch scripts/test.sbatch`: Slurm 839332 gave `458 passed in 66.73s`.
+  - Limit: a wrong-length window in a later batch surfaces as Lance's `OSError`, not
+    `ValueError`. Lance commits nothing in that case.
+- 2026-11-22, step 5, Red:
+  - `test_permute.py` fails at collection: `cannot import name 'Permute'`.
+  - `test_lance_window_dataset.py` fails at collection: `cannot import name
+    'LanceWindowDataset'`.
+  - `test_data_config.py` gives `6 failed, 19 passed`: no `shuffle_seed`, `version` or
+    `"lance"` yet.
+  - `test_build_dataset.py` gives `1 failed, 9 passed`: no shuffling yet.
+- 2026-11-22, step 5, Green:
+  - The user implemented `Permute` (`core/data.py`), `LanceWindowDataset`
+    (`core/lance_windows.py`), the `DataConfig` fields and checks, and the lance branch of
+    `build_dataset`.
+  - Review fixes: `Permute` stored no `dataset` and returned the index instead of the
+    sample; an attribute-name mismatch in `LanceWindowDataset`; a `config.format` typo.
+  - The four step 5 test files give `47 passed`.
+  - Full suite via `sbatch scripts/test.sbatch -q`: Slurm 839703 gives 477 passed, with no
+    failures, errors or skips. The doubled `-q` suppresses pytest's summary line, so the
+    count is from the progress dots.
+- Agreed split (2026-11-22): steps 1–3 and 5 (hand-written) go to one PR. Step 4
+  (vibe-coded if the host agrees) goes to a separate branch from `feat/data-pipeline`.
+- Next:
+  - Open the PR for steps 1–3 and 5.
+  - Step 4 is designed after the host confirms whether it may be vibe-coded. First check
+    Lance 14.0.3 `lance.fragment.write_fragments` and `LanceDataset.commit` in a scratch
+    script.
+  - After step 4: an 8-GPU 150M smoke reading Lance from Flock S3, to decide whether
+    batched reads are needed.
 - Later refactor, after the new pipeline runs end to end:
   - Move the prep-time functions out of `core/data.py` into `prep/`: `load_dataset`,
     `load_dev_ids`, `prepare_token_shards`, `write_token_shard`.

@@ -135,6 +135,22 @@ class Truncate:
         return self.dataset[i]
 
 
+class Permute:
+    def __init__(self, dataset, seed):
+        self.dataset = dataset
+        self.order = np.random.default_rng(seed).permutation(len(dataset))
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, i):
+        n = len(self)
+        if i < 0:
+            i += n
+        if i < 0 or i >= n:
+            raise IndexError(f"index {i} out of range for {n} samples")
+        return self.dataset[int(self.order[i])]
+
 
 def read_parquet_rows(path, columns):
     for batch in pq.ParquetFile(path).iter_batches(columns=columns):

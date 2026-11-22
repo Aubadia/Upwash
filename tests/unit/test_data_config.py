@@ -48,8 +48,8 @@ def test_data_config_does_not_touch_the_file_system():
     assert config.root == "/does/not/exist"
 
 
-@pytest.mark.parametrize("fmt", ["npy", "bin"])
-def test_data_config_accepts_npy_and_bin_formats(fmt):
+@pytest.mark.parametrize("fmt", ["npy", "bin", "lance"])
+def test_data_config_accepts_npy_bin_and_lance_formats(fmt):
     assert make_data_config(format=fmt).format == fmt
 
 
@@ -77,4 +77,26 @@ def test_data_config_rejects_a_budget_smaller_than_one_sample(num_tokens):
 
 
 def test_data_config_to_dict_returns_every_setting():
-    assert make_data_config().to_dict() == FLOCK_150M
+    # shuffle_seed and version were added for Lance token datasets (task 033, step 5).
+    assert make_data_config().to_dict() == {**FLOCK_150M, "shuffle_seed": None, "version": None}
+
+
+def test_data_config_shuffle_seed_and_version_default_to_none():
+    config = make_data_config()
+
+    assert config.shuffle_seed is None
+    assert config.version is None
+
+
+def test_a_lance_config_may_pin_a_version_and_a_shuffle_seed():
+    config = make_data_config(root="s3://bucket/tokens/dclm", pattern="", format="lance",
+                              version=3, shuffle_seed=42)
+
+    assert (config.format, config.version, config.shuffle_seed) == ("lance", 3, 42)
+
+
+@pytest.mark.parametrize("fmt", ["npy", "bin"])
+def test_a_version_is_rejected_for_local_formats(fmt):
+    # Local token files have no versions; accepting one would silently ignore it.
+    with pytest.raises(ValueError, match="version"):
+        make_data_config(format=fmt, version=1)

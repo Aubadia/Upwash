@@ -37,7 +37,17 @@ Current task (2026-11-22): [033 — Data pipeline](033-data-pipeline.md), on bra
 - Step 3:
   - Flock path `lab7/dxnn1u-asciibase64/`. On S3, write works and random reads of 32 rows run at 445 windows/s with 8 threads; a 1B run needs about 100.
   - Red: `tests/unit/core/test_lance_windows.py` fails at collection on the missing `upwash.core.lance_windows`.
-- Next: the user implements `core/lance_windows.py`.
+- Green (step 3, 2026-11-22): `core/lance_windows.py` implemented by the user. Full suite (Slurm 839332) gives `458 passed`.
+- Decided (2026-11-22):
+  - DCLM is the baseline. Code sources skip decontamination (Paloma C.1; ask the TA about overlap with Paloma code).
+  - Step 4 uses option B: fragments per job plus one commit.
+  - Step 5 is hand-written, and step 4 may be vibe-coded if the host agrees.
+- Red (step 5): `Permute`, `LanceWindowDataset` and `DataConfig(format="lance", version, shuffle_seed)`. 47 new or updated cases pass on a scratch reference.
+- Green (step 5, 2026-11-22): the user implemented the step 5 code. The step 5 files give `47 passed`, and the full suite (Slurm 839703) gives 477 passed.
+- Next:
+  - A PR for the hand-written steps 1–3 and 5.
+  - Step 4 on its own branch, once the host answers about vibe-coding.
+  - Then an 8-GPU smoke reading Lance from Flock.
 
 PR #17 H200 verification (2026-11-21/22, by the agent with scratch scripts outside git; 150M, 8×H200, 200 steps):
 - Slurm 821823: FA3 runs (`flash_attention_3`). All options give 1.37× over eager (1,696,890 → 2,325,874 tok/s), peak memory falls from 28.4 to 14.3 GB, eval loss matches, and replicas are bit-identical. DDP-then-compile and compile-then-DDP run within 1%.
