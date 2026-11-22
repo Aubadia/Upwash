@@ -23,7 +23,24 @@ before launching the affected runs.
 
 ## Resume Here
 
-Current task (2026-11-20): [027 — Gradient clipping](027-gradient-clipping.md)
+Current task (2026-11-20): [028 — Data pipeline](028-data-pipeline.md), on branch `feat/data-pipeline` from `main` at `e2efe61`.
+
+- Design: each source goes through Paloma decontamination, tokenization and packing into a token Lance dataset in Flock S3 once. Training mixes the token datasets by weight. Measured on a nano4 compute node: sequential Flock reads of 757–881 MB/s, random document reads of only 160–290 docs/s, tokenization of 5.5–7.3M tok/s per node.
+- Decontamination follows Paloma C.1:
+  - Exact paragraph matching. Evaluation paragraphs need 13 or more UAX #29 tokens; symbol-only paragraphs are ignored.
+  - Whole documents are removed. Code sources are not decontaminated.
+  - Agreed: `regex` WORD mode for segmentation, a hash set instead of a Bloom filter, both Paloma splits, and the `src/upwash/prep/` module.
+- Red (step 1): `tests/unit/prep/test_decontam.py` fails at collection on the missing `upwash.prep`.
+- Green (step 1, 2026-11-21): the user implemented `prep/decontam.py`. Full suite via `sbatch scripts/test.sbatch` (Slurm 820744) gives `414 passed`.
+- Red (step 2): `encode_document` and `pack_windows` (option A: one `seq_len + 1` window per row, `[BOS, text, EOS]`). `tests/unit/prep/test_pack.py` fails at collection on the missing module.
+- Green (step 2, 2026-11-21): `prep/pack.py` implemented by the user; full suite (Slurm 820764) gives `428 passed`.
+- Step 3:
+  - Flock path `lab7/dxnn1u-asciibase64/`. On S3, write works and random reads of 32 rows run at 445 windows/s with 8 threads; a 1B run needs about 100.
+  - Red: `tests/unit/core/test_lance_windows.py` fails at collection on the missing `upwash.core.lance_windows`.
+- Next: the user implements `core/lance_windows.py`.
+
+
+Previous task (2026-11-20): [027 — Gradient clipping](027-gradient-clipping.md)
 on `feat/grad_clip`, based on `main` at `73b1875`.
 
 - Agreed: optional `max_grad_norm`, global L2 clipping between backward and
