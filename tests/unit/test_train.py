@@ -431,3 +431,58 @@ def test_train_with_logging_disabled_does_not_initialize_sdk(
     assert recording_sdk.settings == []
     assert recording_sdk.events == []
     assert recording_sdk.finished == 0
+
+
+def test_public_train_uses_stream_and_resumes_global_progress(tmp_path, make_optimizer_config):
+    from contextlib import contextmanager
+
+    from upwash.adaptor import build_llama_model
+    from upwash.core.trainer import TrainingProgress
+    from upwash.train import RunHooks, train
+
+    config = make_run_config(tmp_path, make_optimizer_config, train_data=None)
+    config.training.logging_steps = 1
+    inputs = torch.tensor([[1, 2, 3, 4]])
+    targets = torch.tensor([[2, 3, 4, 5]])
+    events = []
+    logger = Mock()
+    built_model = build_llama_model(config.model)
+
+    @contextmanager
+    def batches(runtime):
+        events.append(("open", runtime.rank))
+        try:
+            yield [(inputs, targets), (inputs, targets)]
+        finally:
+            events.append(("close", runtime.rank))
+
+    def build_optimizer(model, *, config):
+        return torch.optim.SGD(model.parameters(), lr=config.lr)
+
+    def prepare(runtime, model, trainer):
+        assert runtime.rank == 0
+        assert model is built_model
+        assert trainer.lr_scheduler.total_steps == 5
+        trainer.lr_scheduler.load_state_dict({"update": 4})
+        trainer.logger = logger
+        return TrainingProgress(step=3, tokens=12)
+
+    def after_step(progress):
+        events.append(progress)
+        return {"custom_metric": float(progress.tokens)}
+
+    hooks = RunHooks(
+        batches=batches, build_model=lambda _: built_model, build_optimizer=build_optimizer,
+        prepare=prepare, after_step=after_step, schedule_steps=5,
+    )
+    result = train(config, hooks=hooks)
+
+    assert result.model is built_model
+    assert result.state.global_step == 5
+    assert events == [
+        ("open", 0), TrainingProgress(step=4, tokens=16),
+        TrainingProgress(step=5, tokens=20), ("close", 0),
+    ]
+    assert [call.kwargs["step"] for call in logger.log.call_args_list] == [4, 5]
+    assert [call.args[0]["custom_metric"] for call in logger.log.call_args_list] == [16.0, 20.0]
+    assert [call.args[0]["train/total_tokens_seen"] for call in logger.log.call_args_list] == [16, 20]

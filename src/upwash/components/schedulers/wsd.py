@@ -25,20 +25,30 @@ class WSDScheduler:
         self.update += 1
         self._apply_lr()
 
-    def _apply_lr(self):
-        if self.update <= self.warmup_steps:
-            factor = self.update / self.warmup_steps
-        elif self.decay_steps > 0 and self.update > self.decay_start:
-            progress = min(1.0, (self.update - self.decay_start) / self.decay_steps)
-            if self.decay_shape == "cosine":
-                factor = 0.5 * (1.0 + math.cos(math.pi * progress))
-            elif self.decay_shape == "power":
-                factor = (1.0 - progress) ** self.decay_power
-            else:
-                factor = 1.0 - progress
-        else:
-            factor = 1.0
+    def state_dict(self):
+        return {"update": self.update}
 
+    def load_state_dict(self, state_dict):
+        update = state_dict["update"]
+        if isinstance(update, bool) or not isinstance(update, int) or update <= 0:
+            raise ValueError("scheduler update must be a positive integer")
+        self.update = update
+        self._apply_lr()
+
+    def factor_at(self, update: int) -> float:
+        if update <= self.warmup_steps:
+            return update / self.warmup_steps
+        if self.decay_steps > 0 and update > self.decay_start:
+            progress = min(1.0, (update - self.decay_start) / self.decay_steps)
+            if self.decay_shape == "cosine":
+                return 0.5 * (1.0 + math.cos(math.pi * progress))
+            if self.decay_shape == "power":
+                return (1.0 - progress) ** self.decay_power
+            return 1.0 - progress
+        return 1.0
+
+    def _apply_lr(self):
+        factor = self.factor_at(self.update)
         for group, base_lr in zip(self.optimizer.param_groups, self.base_lrs, strict=True):
             group["lr"] = base_lr * factor
 

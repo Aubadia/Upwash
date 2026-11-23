@@ -137,6 +137,24 @@ training calls do not affect the next interval's rate. Zero elapsed time emits
 throughput. These behaviors are verified with a simulated clock and real CPU
 training; GPU synchronization and distributed throughput remain unverified.
 
+
+## Streaming through the language-model entry point
+
+`upwash.train.train(config, hooks=RunHooks(...))` accepts a context manager
+that supplies a per-rank iterable of training batches after runtime setup.
+Set `RunConfig.train_data=None` when the hooks supply the data. The entry point
+still owns model and optimizer construction, DDP, compilation, and the single
+call to `Trainer.train`. The supplied iterable owns any sharding it needs.
+Use `schedule_steps` when the iterable has no length or when a resumed
+iterator is shorter than the original schedule horizon.
+
+Optional model and optimizer factories let an experiment supply its recipe.
+The `prepare` hook runs after the trainer has been built and may restore model,
+optimizer, and WSD state, then return `TrainingProgress(step, tokens)`.
+The `after_step` hook sees absolute progress after a completed update and can
+return metrics for the same step. The streaming baseline uses that hook to
+write checkpoints and evaluate its Paloma validation subset.
+
 ## References
 
 - [PyTorch: Optimizing Model Parameters](https://docs.pytorch.org/tutorials/beginner/basics/optimization_tutorial.html): the basic loss, backward, gradient clearing, and optimizer update flow.

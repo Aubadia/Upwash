@@ -1,6 +1,7 @@
 import time
 import math
 from contextlib import contextmanager, nullcontext
+from dataclasses import dataclass
 
 import torch
 
@@ -54,6 +55,12 @@ class _LoggingInterval:
             self.excluded_time += time.perf_counter() - started_at
 
 
+@dataclass(frozen=True)
+class TrainingProgress:
+    step: int = 0
+    tokens: int = 0
+
+
 class Trainer:
     def __init__(
         self,
@@ -97,16 +104,25 @@ class Trainer:
         predictions = self.model(inputs)
         return self.loss_fn(predictions, targets)
 
-    def train(self, batches, *, eval_batches=None) -> TrainingState:
+    def train(self, batches, *, eval_batches=None, progress=None, after_step=None) -> TrainingState:
+        """Train over batches and optionally continue from restored progress.
+
+        after_step receives progress after each completed update. It may
+        return metrics to include in that step's log event.
+        """
         self.model.train()
-        self.state.set_state("global_step", 0)
+        start_step = 0
+        if progress is not None:
+            start_step = progress.step
+            self._total_tokens_seen = progress.tokens
+        self.state.set_state("global_step", start_step)
 
         logging_enabled = self.logger is not None and self.logging_steps is not None
         eval_enabled = self.eval_steps is not None and eval_batches is not None
 
         interval = _LoggingInterval(timed=logging_enabled and self.count_tokens)
-        steps = 0
-        last_eval_step = 0
+        steps = start_step
+        last_eval_step = start_step
         pending_metrics = {}
 
         for inputs, targets in batches:
@@ -124,6 +140,12 @@ class Trainer:
                 interval.metrics(self._total_tokens_seen) if interval_complete else {}
             )
 
+            if after_step is not None:
+                with interval.exclude_time():
+                    metrics = after_step(TrainingProgress(steps, int(self._total_tokens_seen)))
+                if metrics:
+                    pending_metrics.update(metrics)
+
             if eval_enabled and steps % self.eval_steps == 0:
                 pending_metrics.update(self._evaluation_metrics(eval_batches, interval))
                 last_eval_step = steps
@@ -132,7 +154,7 @@ class Trainer:
             if interval_complete:
                 interval.reset()
 
-        if steps == 0:
+        if steps == start_step:
             raise ValueError("batches cannot be empty")
         self.state.set_state("global_step", steps)
 

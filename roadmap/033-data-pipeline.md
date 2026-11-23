@@ -387,3 +387,157 @@ Step 5 tests (CPU, local Lance directories):
     `load_dev_ids`, `prepare_token_shards`, `write_token_shard`.
   - Delete the unused `read_parquet_rows` and the obsolete `scripts/prepare_fineweb.py`.
   - Make `write_token_shard` use `encode_document`.
+
+
+## DCLM 150M raw streaming baseline — 2026-11-23
+
+- The experiment branch adds `scripts/train_dclm_150m.py` and
+  `scripts/dclm_150m.sbatch`. It reads raw DCLM v1 with Flock's renewable
+  credential process, excludes Paloma validation/test paragraph matches, and
+  streams deterministic packed batches to eight ranks. This experiment uses
+  branch-output residual scaling of `1/6` for both attention and MLP.
+- The horizon is 228,881 updates and 29,999,890,432 non-padding tokens.
+  Checkpoints include the completed step and next data cursor. All run
+  artifacts are under `/work/asciibase64/upwash/dclm-150m/`.
+- `sbatch --gpus-per-node=1 --cpus-per-task=4 --time=00:10:00 scripts/dclm_150m.sbatch --test`
+  (845340) passed the initial four tests. The same resource overrides with
+  `--preflight` (845341) read a text batch and tokenized one row from each
+  pinned Lance snapshot. The Paloma split column is `_hf_split`.
+- `sbatch --gpus-per-node=1 --cpus-per-task=8 --time=00:15:00 scripts/dclm_150m.sbatch --test tests/unit/prep tests/unit/components/schedulers tests/unit/test_adaptor.py tests/integration/test_ddp_training.py`
+  (845350) passed 58 tests.
+- The first eight-GPU smoke (845345) was cancelled after one failed rank
+  blocked in NCCL communicator teardown and hid the original exception.
+  Exception handling now logs the worker error before torchrun cleans up.
+  Its dependent resume (845346) was also cancelled.
+- `sbatch --time=00:20:00 scripts/dclm_150m.sbatch --run-id smoke-2 --stop-after 200`
+  (845364) completed 200 updates and 26,214,400 tokens. The final 100 updates
+  ran at 1.440M tokens/s, with training loss 8.5868 and Paloma validation
+  subset BPB 3.6417. At that rate the training updates alone project to
+  about 5 hours 47 minutes.
+- `sbatch --dependency=afterok:845364 --kill-on-invalid-dep=yes --time=00:15:00 scripts/dclm_150m.sbatch --run-id smoke-2 --resume --stop-after 201`
+  (845365) matched the checkpoint's next-batch hash and three peak LRs, then
+  completed step 201 with 26,345,472 cumulative tokens and validation subset
+  BPB 3.6410. The smoke checkpoint is `runs/smoke-2/latest.pt` under the
+  experiment's work directory.
+- The full run is on hold. The user asked to reuse the existing public
+  `upwash.train.train` entry point. The experiment script already uses
+  `Trainer.train` for the update loop, but duplicates the setup and
+  run lifecycle in the public entry point. Next, align the extension points
+  for streaming batches, the optimizer recipe, and checkpoint/resume.
+
+
+### Public training entry point integration
+
+- The DCLM script now supplies a per-rank stream, recipe factories, and
+  checkpoint and evaluation hooks to `upwash.train.train`. The public entry
+  point builds the runtime, model, DDP, optimizer and scheduler and calls
+  `Trainer.train` once. WSD checkpoints save the next update index.
+- `sbatch --gpus-per-node=1 --cpus-per-task=4 --time=00:10:00 scripts/dclm_150m.sbatch --test tests/unit/test_train.py -k public_train_uses_stream`
+  (845381) produced the expected Red because `TrainingProgress` did not exist.
+- `sbatch --gpus-per-node=1 --cpus-per-task=8 --time=00:15:00 scripts/dclm_150m.sbatch --test tests/unit/test_train.py tests/unit/test_train_ddp.py tests/unit/components/schedulers tests/integration/test_training_logging.py tests/integration/test_scheduled_evaluation.py tests/unit/prep`
+  (845388) passed 103 tests.
+- `sbatch --gpus-per-node=1 --cpus-per-task=12 --time=00:20:00 scripts/dclm_150m.sbatch --test tests/`
+  (845394) passed 484 tests.
+- `sbatch --time=00:20:00 scripts/dclm_150m.sbatch --run-id upwash-entry-smoke --stop-after 500`
+  (845391) completed 65,536,000 tokens. With bounded 16-batch prefetch,
+  the post-warmup intervals ran at 1.846–2.000M tokens/s. Rank 0 waited
+  0.202 seconds for prefetched data across the entire smoke. The slowest
+  steady interval projects to about 4 hours 31 minutes of updates.
+- `sbatch --dependency=afterok:845391 --kill-on-invalid-dep=yes --time=00:15:00 scripts/dclm_150m.sbatch --run-id upwash-entry-smoke --resume --stop-after 501`
+  (845393) matched the saved next-batch hash, restored all three LRs, and
+  completed the next update for a total of 65,667,072 tokens.
+- `sbatch scripts/dclm_150m.sbatch --run-id dclm-v1-150m-seed42` submitted the
+  eight-H200, five-hour full run as 845412. Output directory is
+  `/work/asciibase64/upwash/dclm-150m/runs/dclm-v1-150m-seed42/`.
+- Slurm 845412 is running. Its first periodic checkpoint was written at
+  step 5,000 to `latest.pt` (1,592,739,591 bytes). At that update it had
+  processed 655,360,000 tokens, with training loss 4.1372 and 1.945M
+  tokens/s over the preceding logging interval. The prescribed endpoint
+  and `final.pt` remain pending.
+
+### Flock logging and Lab 7 OJ fields
+
+- The submitted training job writes `metrics.jsonl`. A separate lightweight
+  `scripts/sync_dclm_flock.py` process backfilled it into
+  [Flock run d845412](https://flock.cerulean.works/cerulean-labs/lab7-data-curation/runs/d845412)
+  and follows new records under the same run ID. It runs in the
+  `upwash-flock-845412` tmux session without interrupting training.
+- The Flock HTTP API read-back verified 137 training-loss points from
+  step 100 through 13,700 and the corresponding 1,795,686,400 cumulative
+  tokens in the run summary. Synchronizer output is in
+  `/work/asciibase64/upwash/dclm-150m/logs/flock-845412.out`.
+- The Lab 7 OJ reads `oj_total_tokens`, `total_tokens`, and `paloma_ppl`
+  from the Flock run summary. The synchronizer sets `total_tokens` after
+  Slurm reports completion and the final checkpoint and metric step exist.
+  `eval/bpb` is the 128-document validation subset used for training
+  diagnostics. It is separate from the final qualifying Paloma score.
+- The first Paloma smoke (845487) restored the checkpoint but could not fetch
+  the gated Hugging Face dataset. The retry (845491) staged Flock's copy of
+  `allenai/paloma@65cd6fc59dba021b21db414fa5e8d7765ffbe5e6` and passed
+  one pinned test document per task, covering 309 tasks and nine sources.
+- `sbatch --dependency=afterok:845412 --kill-on-invalid-dep=yes scripts/eval_dclm_paloma.sbatch <run-dir>/final.pt --out <run-dir>/paloma-final --flock-run-id d845412`
+  queued the full evaluator as 845506. It uses the saved model with Upwash's
+  residual and logits scaling and writes Flock task and source results under
+  the run directory. It publishes the mean of the nine source BPB scores as
+  `paloma_ppl` per the Lab 7 macro BPB convention. For this single-pass
+  DCLM stream, both token fields use the verified count in the final
+  checkpoint. It reads the three summary values back from Flock after upload.
+  The full evaluation and summary read-back remain pending.
+
+
+### Spectral Muon and width-scaled decay
+
+- New DCLM runs pass one Muon group at base LR `0.0017` with
+  `adjust_lr_fn="spectral_unclamped"` and momentum `0.9`. AdamW retains
+  `0.00272` and betas `(0.9, 0.99)`. Log the group LRs before Muon's
+  internal shape adjustment.
+- Following [Qiu et al., §3.4](https://proceedings.nips.cc/paper_files/paper/2025/file/bdcd9f6327db5877dee502cdec183159-Paper-Conference.pdf)
+  and the [reference scheduler implementation](https://github.com/charliezchen/scaling-matrix-preconditioning/blob/main/train.py),
+  apply independent decay `s(t) * c / d_model` before the parameter update,
+  with the same WSD factor `s(t)` for the gradient update. At width 768,
+  `c=0.0175` gives Muon peak decay `2.278645833e-5`. Treating the AdamW
+  surface value `2.63e-5` as its own `c` gives peak decay `3.424479167e-8`.
+- The in-flight baseline (845412) retains its recorded optimizer recipe.
+  Resuming a checkpoint with its original group layout uses that recipe.
+  Fresh runs now use spectral Muon.
+- `sbatch --gpus-per-node=1 --cpus-per-task=4 --time=00:10:00 scripts/dclm_150m.sbatch --test -k optimizer_partitions`
+  (845590) reproduced the intended Red because the old groups used
+  `original` instead of `spectral_unclamped`. The first regression run
+  (845593) had 39 passes and one reference comparison failure caused by
+  PyTorch's default `weight_decay=0.1` in the test oracle. After setting the
+  oracle's built-in decay to zero, the regression rerun (845596) passed all
+  40 tests.
+- The first eight-H200 smoke (845594) encountered a Flock S3 manifest read
+  error before training. The retry (845601) on a different node completed
+  200 steps and 26,214,400 tokens. The final metrics logged Muon peak LR
+  `0.0017`, AdamW peak LR `0.00272`, and finite training loss `8.5488`.
+  Command: `sbatch --exclude=25a-hgpn173 --time=00:15:00 scripts/dclm_150m.sbatch --run-id spectral-unclamped-smoke-retry --stop-after 200`.
+  Next, use this recipe for fresh model runs and retain the original recipe
+  for resuming 845412.
+
+
+### Fresh spectral baseline with validation at each checkpoint
+
+- Cancelled the original training (845412) and its dependent evaluation
+  (845506) at the user's request. The original run logged through step
+  52,000, and its most recent saved checkpoint is from step 50,000. Flock
+  closed `d845412` and retained its history.
+- A single callback saves and evaluates at steps 5,000, 10,000, and all
+  subsequent checkpoint intervals, plus the terminal step. It evaluates
+  the fixed 128-document Paloma validation subset and logs the result on
+  the checkpoint's training step. The endpoint alone runs the full
+  309-task Paloma test suite in a separate Slurm job.
+- `sbatch --gpus-per-node=1 --cpus-per-task=4 --time=00:10:00 scripts/dclm_150m.sbatch --test -k validation_runs_once_per_saved_checkpoint`
+  (845615) reproduced the intended Red. Step 5,000 saved a checkpoint
+  without evaluating it. The checkpoint, trainer, and WSD regression
+  `sbatch --gpus-per-node=1 --cpus-per-task=6 --time=00:10:00 scripts/dclm_150m.sbatch --test tests/unit/components/schedulers tests/unit/test_train.py`
+  (845621) passed all 41 tests.
+- `sbatch --dependency=afterok:845621 --kill-on-invalid-dep=yes --exclude=25a-hgpn173 scripts/dclm_150m.sbatch --run-id dclm-v1-150m-spectral-seed42`
+  started fresh training as 845622. Its dependent endpoint evaluation is
+  845623. Flock synchronization is running in `upwash-flock-845622`, using
+  run ID `d845622`. The new output directory is
+  `/work/asciibase64/upwash/dclm-150m/runs/dclm-v1-150m-spectral-seed42/`.
+- The first fresh checkpoint (step 5,000) was saved after 655,360,000
+  tokens and evaluated once. The Flock history API returned one point at
+  that step for validation loss `3.405684790` and BPB `1.465683402`.
+  Training is still running, and the full endpoint evaluation is pending.

@@ -23,6 +23,17 @@ before launching the affected runs.
 
 ## Resume Here
 
+The 150M DCLM experiment on `experiment/Data-Curation-Baseline-DCLM` now has a
+[raw streaming baseline](033-data-pipeline.md#dclm-150m-raw-streaming-baseline--2026-11-23).
+Flock preflight, 58 targeted regression tests, and a 200-step eight-GPU
+smoke passed. DCLM now uses the public training entry point, with 484 CPU
+tests passing. The new eight-GPU smoke completed 500 updates at 1.846–2.000M
+tokens/s after warmup and resumed to 501 with the same next-batch hash and
+LRs. The original full run (845412) and evaluation (845506) were cancelled.
+The [fresh spectral baseline](033-data-pipeline.md#fresh-spectral-baseline-with-validation-at-each-checkpoint)
+is running as Slurm 845622 and evaluates a fixed subset at every checkpoint.
+Full Paloma evaluation and OJ summary publication are queued as 845623.
+
 Current task (2026-11-22): [033 — Data pipeline](033-data-pipeline.md), on branch `feat/data-pipeline`. Started from `main` at `e2efe61` and merged `main` at `6142f34` (PR #17) on 2026-11-22. It was renumbered from 028 because PR #17 took 028–032.
 
 - Design: each source goes through Paloma decontamination, tokenization and packing into a token Lance dataset in Flock S3 once. Training mixes the token datasets by weight. Measured on a nano4 compute node: sequential Flock reads of 757–881 MB/s, random document reads of only 160–290 docs/s, tokenization of 5.5–7.3M tok/s per node.

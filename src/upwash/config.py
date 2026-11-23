@@ -154,7 +154,7 @@ class LoggingConfig:
 @dataclass
 class RunConfig:
     model: ModelConfig
-    train_data: DataConfig
+    train_data: DataConfig | None
     training: TrainingConfig
     schedule: ScheduleConfig
     batch_size: int
@@ -173,5 +173,5 @@ class RunConfig:
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 raise ValueError(f"{name} must be a positive integer, got {value}")
-        if self.train_data.num_tokens % self.train_data.seq_len:
+        if self.train_data is not None and self.train_data.num_tokens % self.train_data.seq_len:
             raise ValueError("train_data.num_tokens must be divisible by seq_len")
