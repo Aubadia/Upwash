@@ -179,7 +179,7 @@ def test_rank_scatter_preserves_distinct_windows_and_propagates_exhaustion(tmp_p
 def test_paloma_validation_selection_and_both_decontamination_splits():
     import pyarrow as pa
 
-    from scripts.train_dclm_150m import paloma_data
+    from scripts.train_dclm_150m import paloma_data, paloma_texts, validation_texts
 
     validation = "This validation document has enough words to be included in the decontamination index"
     test = "This test document also contains sufficient words to enter the exact decontamination index"
@@ -191,8 +191,8 @@ def test_paloma_validation_selection_and_both_decontamination_splits():
             return [pa.record_batch([["validation", "test", "train"], [validation, test, train]],
                                     names=columns)]
 
-    index, validation_texts = paloma_data(Dataset())
-    assert validation_texts == [validation]
+    index, selected = paloma_data(Dataset())
+    assert selected == validation_texts(paloma_texts(Dataset())) == [validation]
     assert index.is_contaminated(validation)
     assert index.is_contaminated(test)
     assert not index.is_contaminated(train)

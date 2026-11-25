@@ -541,3 +541,131 @@ Step 5 tests (CPU, local Lance directories):
   tokens and evaluated once. The Flock history API returned one point at
   that step for validation loss `3.405684790` and BPB `1.465683402`.
   Training is still running, and the full endpoint evaluation is pending.
+
+
+### Standalone checkpoint validation — 2026-11-24
+
+- The spectral baseline (845622) finished all 228,881 steps and
+  29,999,890,432 tokens. The separate official Paloma job (845623) completed
+  with nine-source macro BPB `1.123023455` and verified the OJ summary in
+  [Flock run d845622](https://flock.cerulean.works/cerulean-labs/lab7-data-curation/runs/d845622).
+- `sbatch --gpus-per-node=1 --cpus-per-task=4 --time=00:10:00 scripts/dclm_150m.sbatch --eval-checkpoint <checkpoint.pt>`
+  loads checkpoint weights, reconstructs residual and logits scaling, and
+  reuses the in-training Paloma validation scorer. Flock supplies the pinned
+  validation data; the checkpoint replay invokes no Flock evaluator.
+- One-H200 replay of the spectral baseline's `final.pt` (850393) matched
+  all of its in-training validation fields exactly. Loss `2.801663344`,
+  BPB `1.205734445`, 218,850 tokens and 733,644 bytes.
+
+
+### DataDecide 1B recipe replay — 2026-11-24
+
+- Selected workbook 1B MacroRank 1–10 and the three released seeds at
+  step 69,369. The manifest records the model commit for each of the
+  30 checkpoints and the ordered Paloma v1 validation snapshot.
+  It contains the same 128 documents and 733,644 bytes as the baseline.
+- The scorer reuses Upwash validation with Ai2's native OLMo loader,
+  EOS prefix, 2,048-token context and BF16 autocast. The isolated workspace
+  environment uses Python 3.11.18, PyTorch 2.6.0+cu124, Transformers 4.50.3,
+  ai2-olmo 0.6.0, NumPy 1.26.4, datasets 3.5.0, PyArrow 19.0.1 and pandas
+  2.2.3. The loader imports datasets at runtime. Its NumPy pin requires
+  compatible Arrow and pandas revisions.
+- `bash scripts/submit_datadecide_paloma.sh <workbook> datadecide-1b-top10-20261124`
+  submitted ten eval jobs (850550–850558 and 850567) and dependent ranking
+  job 850569. The partition accepts nine active submissions and runs four
+  at a time. The launcher resumed the partial submission after the
+  first jobs freed slots, keeping the existing IDs.
+- Outputs are in
+  `/work/asciibase64/upwash/datadecide-paloma/runs/datadecide-1b-top10-20261124/`.
+  All ten evaluation jobs completed and produced 30 seed results.
+  Slurm 850569 passed both numerical and ranking tests, then wrote
+  `ranking.csv` and `ranking.md`. Independent read-back checked model
+  revisions, the common snapshot hash, all means and sample deviations.
+  Falcon+CC (QC Orig 10%) ranked first with mean BPB 1.030950662. The
+  report is a ranking of the selected recipes on this validation subset.
+
+
+### DataDecide 150M training with confirmed Paloma early stopping
+
+- Reuse the 150M spectral baseline through Upwash's training entry point.
+  The recipes are Paloma replay ranks 1, 2, 3, 5 and 6. Rank 4 is the
+  already-trained DCLM baseline.
+- `sbatch scripts/dclm_150m.sbatch --prepare-datadecide <manifest>` indexes
+  the exact files in the pinned Ai2 registry against the Flock DataDecide
+  v1 Lance table. The initial resource request was rejected because it
+  requested more than 12 CPUs per GPU. The corrected one-GPU, 12-CPU job
+  850792 passed and wrote the manifest under
+  `/work/asciibase64/upwash/dclm-150m/datadecide-top5/`.
+- Reconstruct OLMo documents across Lance row boundaries, apply the existing
+  Paloma decontamination, and encode with the baseline Llama 3.2 tokenizer.
+  Each run shuffles its files with a fixed seed, scans the selected source
+  positions once, and can restore the mixture from its checkpoint.
+- Every 5,000 steps, save the checkpoint and run the fixed Upwash Paloma
+  validation. At local BPB at or below 1.25, pause all ranks and run the
+  full official nine-source Flock scorer on the saved checkpoint. End
+  training at that step if official macro BPB is also at or below 1.25.
+  Confirm the full suite at the token cap as well. The final checkpoint
+  has a second filesystem name for the same bytes, and the Flock logger
+  validates the terminal step, token count and matching scores before
+  publishing the OJ fields.
+- The Red job 850782 failed during collection because the recipe module
+  did not yet exist. The Green job 850797 passed 31 targeted tests. Job
+  850805 passed 14 tests, including rejection of mismatched Flock
+  summaries and the check that the early stop consumes no further
+  training batch. Both used the `--test` mode of
+  `scripts/dclm_150m.sbatch`.
+
+- Eight-H200 job 850802 completed 50 real updates, saved the checkpoint
+  and evaluated the same 128 validation documents. Job 850811 restored
+  the data cursor and scheduler, reproduced next-batch SHA-256
+  `da409a818a31789223949f31dcb1513a23de217f5b7c34d3a77d356a8891611d`,
+  and completed step 51.
+- `bash scripts/submit_datadecide_training.sh datadecide-gate-20261124`
+  submitted the five production recipes with eight H200s and a six-hour
+  allocation each. The job IDs in rank order are 850822, 850823, 850824,
+  850825 and 850830. The original rank-6 submission 850826 passed
+  `sbatch --test-only` but could not dispatch because `32gpus` requires
+  at least 17 GPUs. The account is restricted from other eligible
+  eight-GPU queues. The replacement retains eight GPUs and queues in
+  `8gpus`, which permits four concurrent jobs per user. All five
+  production jobs are independent.
+- The batch ledger is
+  `/work/asciibase64/upwash/dclm-150m/datadecide-top5/datadecide-gate-20261124.tsv`.
+  Flock synchronization runs in one tmux session per Slurm job. API
+  read-back confirmed the first four training runs and the first three
+  step-5,000 validation BPBs at 1.518925795, 1.543089046 and 1.515096853.
+  Each has its corresponding checkpoint. The rank-6 job is queued.
+- Full-score confirmation smoke 850817 completed the nine-source
+  evaluator on the existing 150M baseline, verified the existing
+  1.123023455 macro BPB and its qualification, and reused the result
+  only after validating the checkpoint digest and progress. Production
+  Paloma results and the final OJ summaries remain pending.
+
+
+### Full-horizon DataDecide training
+
+- Train each recipe to 228,881 steps (29,999,890,432 tokens) by default.
+  The fixed validation subset runs at each 5,000-step checkpoint.
+  The full nine-source Flock Paloma suite scores the final checkpoint.
+  The previous BPB-gated behavior is available through `--early-stop`.
+- The Paloma execution policy stays outside the checkpoint configuration.
+  Resume restores the original schedule, optimizer, RNG and data cursor.
+  The Flock sidecar can attach a replacement Slurm ID to the original
+  Flock run and waits for recovery to reconcile the metric file before
+  uploading new steps.
+- Slurm test command
+  `sbatch --gpus-per-node=1 --cpus-per-task=4 --time=00:10:00 scripts/dclm_150m.sbatch --test tests/unit/test_train_datadecide_recipes.py`.
+  Job 851338 passed all 18 tests. The queued rank-6 job 850830 started
+  with the new default through the existing entry point.
+- The four earlier runs handed off at a recorded checkpoint. Ranks 1, 2
+  and 3 resume from step 100,000 under jobs 851389, 851350 and 851357.
+  Rank 5 resumes from step 95,000 under 851341. Each replacement retains
+  the original Flock ID. The 8gpus concurrency limit queued 851389.
+- The checkpoint cutover and endpoint monitor record replacement job IDs
+  and verify each full checkpoint against the matching official result
+  and Flock OJ metrics under
+  `/work/asciibase64/upwash/dclm-150m/datadecide-top5/full-horizon-20261124/`.
+- Flock read-back confirmed continued training after the three active
+  checkpoint resumes and confirmed metrics for rank 6. The first
+  post-cutover read-back saw d850823 at 100,700, d850824 at 100,300, d850825 at 95,900, d850830 at 4,400.
+  Final Paloma and OJ results are pending.

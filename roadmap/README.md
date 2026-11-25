@@ -31,8 +31,31 @@ tests passing. The new eight-GPU smoke completed 500 updates at 1.846–2.000M
 tokens/s after warmup and resumed to 501 with the same next-batch hash and
 LRs. The original full run (845412) and evaluation (845506) were cancelled.
 The [fresh spectral baseline](033-data-pipeline.md#fresh-spectral-baseline-with-validation-at-each-checkpoint)
-is running as Slurm 845622 and evaluates a fixed subset at every checkpoint.
-Full Paloma evaluation and OJ summary publication are queued as 845623.
+completed as Slurm 845622, and the official Paloma evaluation (845623)
+published macro BPB 1.123023455 and verified the OJ summary. The
+[standalone validation command](033-data-pipeline.md#standalone-checkpoint-validation--2026-11-24)
+reproduced the endpoint's in-training validation at 1.205734445 BPB.
+
+The [DataDecide 1B replay](033-data-pipeline.md#datadecide-1b-recipe-replay--2026-11-24)
+completed ten eval jobs and ranking job 850569. On Upwash's 128-document
+Paloma validation, Falcon+CC (QC Orig 10%) ranked first at 1.030951 mean
+BPB across the three step-69,369 seeds.
+
+
+The [DataDecide 150M training task](033-data-pipeline.md#datadecide-150m-training-with-confirmed-paloma-early-stopping)
+has a verified Flock source manifest, passing Paloma gate tests and an
+eight-H200 checkpoint resume with a matching next-batch hash. The five
+production recipes were submitted as 850822–850825 and 850830. Four
+are running with Flock logging and the fifth is queued under the
+partition's concurrency limit. Read-back verified the first three
+step-5,000 validation results.
+
+
+The [full-horizon update](033-data-pipeline.md#full-horizon-datadecide-training)
+schedules all five recipes to the original token cap with periodic local
+validation and official evaluation at the endpoint. Existing training
+resumes from the latest checkpoint and keeps the original Flock IDs.
+
 
 Current task (2026-11-22): [033 — Data pipeline](033-data-pipeline.md), on branch `feat/data-pipeline`. Started from `main` at `e2efe61` and merged `main` at `6142f34` (PR #17) on 2026-11-22. It was renumbered from 028 because PR #17 took 028–032.
 

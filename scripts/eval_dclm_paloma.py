@@ -25,7 +25,7 @@ from scripts.train_dclm_150m import BOS, DCLM_URI, DATASET_VERSION, EOS, build_m
 from upwash.config import ModelConfig
 
 
-def score(checkpoint, tokenizer_dir, out, *, limit, batch_tokens):
+def score(checkpoint, tokenizer_dir, out, *, limit, batch_tokens, allow_training_checkpoint=False):
     if out.exists() and any(out.iterdir()):
         raise FileExistsError(f"Evaluation output directory is not empty: {out}")
     if root := hub.root():
@@ -36,12 +36,17 @@ def score(checkpoint, tokenizer_dir, out, *, limit, batch_tokens):
         stream.seek(0)
         saved = torch.load(stream, map_location="cpu", weights_only=True)
     run_config = saved["config"]
-    if limit is None and (
+    if limit is None and not allow_training_checkpoint and (
         saved["step"] != run_config["planned_steps"]
         or saved["tokens"] != run_config["planned_tokens"]
         or run_config["dclm"] != [DCLM_URI, DATASET_VERSION]
     ):
         raise ValueError("Full Paloma evaluation expects the verified final DCLM checkpoint")
+    if allow_training_checkpoint and (
+        saved["step"] <= 0 or saved["step"] > run_config["planned_steps"]
+        or saved["tokens"] != saved["step"] * run_config["tokens_per_step"]
+    ):
+        raise ValueError("Checkpoint progress does not match the training configuration")
     config = ModelConfig(**saved["config"]["model"])
     model = build_model(config)
     model.load_state_dict(saved["model"])

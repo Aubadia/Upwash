@@ -12,13 +12,16 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from functools import partial
+from itertools import islice
 from pathlib import Path
 
 import numpy as np
 import torch
 import torch.distributed as dist
 
-from upwash.adaptor import build_llama_model, causal_lm_loss
+from scripts.paloma_validation import evaluate as evaluate_paloma
+from upwash.adaptor import build_llama_model
+from upwash.components.kernels.fa3 import register_upwash_fa3_wrapper
 from upwash.components.optimizers.combined import CombinedOptimizer
 from upwash.config import ModelConfig, OptimizerConfig, RunConfig, ScheduleConfig, TrainingConfig
 from upwash.core.trainer import TrainingProgress
@@ -34,6 +37,7 @@ TOKENS_PER_STEP = SEQ_LEN * GLOBAL_BATCH
 TOTAL_STEPS = 30_000_000_000 // TOKENS_PER_STEP
 CHECKPOINT_EVERY = 5000
 PREFETCH_BATCHES = 16
+VALIDATION_DOCS = 128
 DCLM_URI = "s3://flock-datasets/dclm"
 PALOMA_URI = "s3://flock-datasets/paloma"
 DATASET_VERSION = 1
@@ -169,43 +173,53 @@ def packed_batches(documents, *, cursor, seq_len=SEQ_LEN, batch_size=GLOBAL_BATC
                     windows.clear()
 
 
-def open_sources():
+def open_datasets(*pins):
     import lance
     from flock.hub import s3
 
     s3.get_process(read_only=True)
-    return (
-        lance.dataset(DCLM_URI, version=DATASET_VERSION),
-        lance.dataset(PALOMA_URI, version=DATASET_VERSION),
-    )
+    return tuple(lance.dataset(uri, version=version) for uri, version in pins)
 
 
-def load_tokenizer():
+def open_sources():
+    return open_datasets((DCLM_URI, DATASET_VERSION), (PALOMA_URI, DATASET_VERSION))
+
+
+def load_tokenizer(repo=TOKENIZER, revision=TOKENIZER_REV):
     from huggingface_hub import try_to_load_from_cache, hf_hub_download
     from tokenizers import Tokenizer
 
     path = try_to_load_from_cache(
-        TOKENIZER, "tokenizer.json", revision=TOKENIZER_REV,
+        repo, "tokenizer.json", revision=revision,
         cache_dir=os.environ["DCLM_EXISTING_HF_CACHE"],
     )
     if not isinstance(path, str):
-        path = hf_hub_download(TOKENIZER, "tokenizer.json", revision=TOKENIZER_REV)
+        path = hf_hub_download(repo, "tokenizer.json", revision=revision)
     tokenizer = Tokenizer.from_file(path)
     if (tokenizer.token_to_id("<|begin_of_text|>"), tokenizer.token_to_id("<|end_of_text|>")) != (BOS, EOS):
         raise ValueError("Unexpected Llama 3.2 special-token IDs")
     return tokenizer
 
 
+def paloma_texts(dataset):
+    for batch in dataset.to_batches(columns=["_hf_split", "text"], batch_size=1024):
+        yield from zip(batch.column(0).to_pylist(), batch.column(1).to_pylist(), strict=True)
+
+
+def validation_texts(paloma):
+    texts = (text for split, text in paloma if split == "validation" and text)
+    return list(islice(texts, VALIDATION_DOCS))
+
+
 def paloma_data(dataset):
     validation = []
 
     def texts():
-        for batch in dataset.to_batches(columns=["_hf_split", "text"], batch_size=1024):
-            for split, text in zip(batch.column(0).to_pylist(), batch.column(1).to_pylist(), strict=True):
-                if split in ("validation", "test") and text:
-                    if split == "validation" and len(validation) < 128:
-                        validation.append(text)
-                    yield text
+        for split, text in paloma_texts(dataset):
+            if split in ("validation", "test") and text:
+                if split == "validation" and len(validation) < VALIDATION_DOCS:
+                    validation.append(text)
+                yield text
 
     index = ContaminationIndex.from_texts(texts())
     if not validation or not len(index):
@@ -289,27 +303,27 @@ class DistributedBatches:
 
 
 def evaluate(model, tokenizer, validation, device):
-    loss_sum = 0.0
-    tokens = 0
-    nbytes = 0
-    was_training = model.training
-    model.eval()
-    try:
-        with torch.no_grad(), torch.autocast("cuda", dtype=torch.bfloat16):
-            for text in validation:
-                ids = [BOS] + tokenizer.encode(text, add_special_tokens=False).ids
-                nbytes += len(text.encode("utf-8"))
-                for start in range(0, len(ids) - 1, SEQ_LEN):
-                    window = torch.tensor(ids[start:start + SEQ_LEN + 1], device=device).unsqueeze(0)
-                    targets = window[:, 1:]
-                    loss_sum += causal_lm_loss(model(window[:, :-1]), targets).item() * targets.numel()
-                    tokens += targets.numel()
-    finally:
-        model.train(was_training)
-    if not tokens or not nbytes or not math.isfinite(loss_sum):
-        raise RuntimeError("Paloma validation loss is unavailable or non-finite")
-    return {"eval/loss": loss_sum / tokens, "eval/bpb": loss_sum / (math.log(2) * nbytes),
-            "eval/tokens": tokens, "eval/bytes": nbytes}
+    return evaluate_paloma(
+        model, tokenizer, validation, device, prefix_token_id=BOS, seq_len=SEQ_LEN,
+    )
+
+
+def evaluate_checkpoint(path):
+    saved = torch.load(path, map_location="cpu", weights_only=True, mmap=True)
+    config = saved["config"]
+    model = build_model(ModelConfig(**config["model"]))
+    model.load_state_dict(saved["model"])
+    step = saved["step"]
+    del saved
+
+    device = "cuda"
+    model.to(device)
+    register_upwash_fa3_wrapper()
+    model.set_attn_implementation(config["attention"])
+    tokenizer = load_tokenizer(*config["tokenizer"])
+    (paloma,) = open_datasets(config["paloma"])
+    validation = validation_texts(paloma_texts(paloma))
+    return {"step": step, **evaluate(model, tokenizer, validation, device)}
 
 
 def metadata(attention, *, legacy_optimizer=False):
@@ -438,13 +452,7 @@ class DCLMRun:
             if not self.args.resume:
                 self.args.run_dir.mkdir(parents=False, exist_ok=False)
                 (self.args.run_dir / "config.json").write_text(json.dumps(self.config, indent=2) + "\n")
-            dclm, paloma = open_sources()
-            self.tokenizer = load_tokenizer()
-            index, self.validation = paloma_data(paloma)
-            print(f"READY dclm_version={dclm.version} paloma_version={paloma.version} "
-                  f"decontamination_hashes={len(index)} startup_seconds={time.monotonic() - self.started:.2f}",
-                  flush=True)
-            source = packed_batches(encoded_documents(dclm, self.tokenizer, index, cursor), cursor=cursor)
+            source = self.make_source(cursor)
 
         self.stream = DistributedBatches(runtime, source, trace=self.limit < TOTAL_STEPS)
         try:
@@ -455,6 +463,15 @@ class DCLMRun:
             raise
         else:
             self.stream.close()
+
+    def make_source(self, cursor):
+        dclm, paloma = open_sources()
+        self.tokenizer = load_tokenizer()
+        index, self.validation = paloma_data(paloma)
+        print(f"READY dclm_version={dclm.version} paloma_version={paloma.version} "
+              f"decontamination_hashes={len(index)} startup_seconds={time.monotonic() - self.started:.2f}",
+              flush=True)
+        return packed_batches(encoded_documents(dclm, self.tokenizer, index, cursor), cursor=cursor)
 
     def prepare(self, runtime, model, trainer):
         self.model = model
@@ -527,6 +544,9 @@ class DCLMRun:
             batches=self.batches, build_model=build_model, build_optimizer=optimizer_factory,
             prepare=self.prepare, after_step=self.after_step, schedule_steps=TOTAL_STEPS,
         ))
+        self.finalize(result)
+
+    def finalize(self, result):
         if result.state.global_step != self.limit:
             raise RuntimeError("Training did not reach the requested endpoint")
         if self.runtime.is_main and self.limit == TOTAL_STEPS:
@@ -539,9 +559,14 @@ def main():
     parser.add_argument("--run-id")
     parser.add_argument("--stop-after", type=int, default=TOTAL_STEPS)
     parser.add_argument("--resume", action="store_true")
-    parser.add_argument("--preflight", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--preflight", action="store_true")
+    mode.add_argument("--eval-checkpoint", type=Path, help="Run local Paloma validation on saved weights.")
     parser.add_argument("--attention", choices=["upwash_fa3", "sdpa"], default="upwash_fa3")
     args = parser.parse_args()
+    if args.eval_checkpoint is not None:
+        print(json.dumps(evaluate_checkpoint(args.eval_checkpoint), allow_nan=False))
+        return
     if args.preflight:
         dclm, paloma = open_sources()
         tokenizer = load_tokenizer()

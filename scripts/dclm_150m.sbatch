@@ -35,6 +35,11 @@ if [[ "${1:-}" == --test ]]; then
     exit
 fi
 
+if [[ "${1:-}" == --prepare-datadecide ]]; then
+    shift
+    exec "$python" scripts/prepare_datadecide_recipes.py "$@"
+fi
+
 if [[ "${1:-}" == --preflight ]]; then
     "$python" scripts/train_dclm_150m.py "$@"
     exit
@@ -43,5 +48,29 @@ fi
 fa3_build=/work/asciibase64/upwash/vendor/flash-attention/hopper/build/lib.linux-x86_64-cpython-314
 if [[ -d "$fa3_build" ]]; then
     export PYTHONPATH="$PYTHONPATH:$fa3_build"
+fi
+if [[ "${1:-}" == --eval-checkpoint ]]; then
+    "$python" scripts/train_dclm_150m.py "$@"
+    exit
+fi
+
+if [[ "${1:-}" == --train-datadecide ]]; then
+    shift
+    export FLOCK_EVAL_HUB="$run_root/cache/eval-hub"
+    export RAYON_NUM_THREADS=16
+    for arg in "$@"; do
+        if [[ "$arg" == --resume ]]; then
+            code=0
+            "$python" scripts/train_datadecide_recipes.py --recover "$@" || code=$?
+            if [[ "$code" == 75 ]]; then
+                exit 0
+            fi
+            if [[ "$code" != 0 ]]; then
+                exit "$code"
+            fi
+            break
+        fi
+    done
+    exec "$python" -m torch.distributed.run --standalone --nproc-per-node=8 scripts/train_datadecide_recipes.py "$@"
 fi
 "$python" -m torch.distributed.run --standalone --nproc-per-node=8 scripts/train_dclm_150m.py "$@"
